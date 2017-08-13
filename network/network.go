@@ -75,7 +75,7 @@ func listenForMessage(port int, address *net.Addr, channel chan string) {
 		endIndex = len(addrStr)
 	}
 	serverListeningStr := addrStr[0:endIndex] + ":" + strconv.Itoa(port)
-	log.Println(serverListeningStr)
+	// Copied from https://varshneyabhi.wordpress.com/2014/12/23/simple-udp-clientserver-in-golang/
 	ServerAddr, err := net.ResolveUDPAddr("udp", serverListeningStr)
 	ServerConn, err := net.ListenUDP("udp", ServerAddr)
 	checkError(err)
@@ -106,23 +106,26 @@ func Listen(port int) (map[string][]net.Addr, chan string, chan string, error) {
 				continue
 			}
 			var listeningToAddresses []net.Addr
+			// Loop for message interfaces
 			addresses := getUpIPV4Addresses(netInterface, true)
-			if len(addresses) > 0 {
-				for _, address := range addresses {
-					go listenForMessage(port, &address, messageChannel)
-					listeningToAddresses = append(listeningToAddresses, address)
-				}
+			for _, address := range addresses {
+				go listenForMessage(port, &address, messageChannel)
+				listeningToAddresses = append(listeningToAddresses, address)
 			}
+			// Loop for broadcast interfaces but listen to the next port from
+			// the port requested for
 			mAddresses := getUpIPV4Addresses(netInterface, false)
-			if len(mAddresses) > 0 {
-				for _, address := range mAddresses {
-					go listenForMessage(port+1, &address, broadcastChannel)
-					listeningToAddresses = append(listeningToAddresses, address)
-				}
+			for _, address := range mAddresses {
+				go listenForMessage(port+1, &address, broadcastChannel)
+				listeningToAddresses = append(listeningToAddresses, address)
 			}
-			listeners[netInterface.Name] = listeningToAddresses
+			//Add if listening to any interface
+			if len(listeningToAddresses) > 0 {
+				listeners[netInterface.Name] = listeningToAddresses
+			}
 		}
 	} else {
+		// Since nothing will be listened to just close them
 		close(messageChannel)
 		close(broadcastChannel)
 		return listeners, messageChannel, broadcastChannel, err
