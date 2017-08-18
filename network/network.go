@@ -8,6 +8,39 @@ import (
 	"strings"
 )
 
+// Config represents configuration for the application to inform which interfaces
+// to listen and broadcast to and also which port to bind to.
+type Config interface {
+	GetInterfaces() []string
+	GetPort() int
+}
+
+type _Config struct {
+	Interfaces []string
+	Port       int
+}
+
+func (conf _Config) GetInterfaces() []string {
+	return conf.Interfaces
+}
+
+func (conf _Config) GetPort() int {
+	return conf.Port
+}
+
+// NewConfig initializes and returns a network configuration to be used for listening and
+// broadcasting
+func NewConfig(port int) Config {
+	return _Config{Port: port, Interfaces: make([]string, 0, 0)}
+}
+
+// Communication defines the interface the application uses to communicate between
+// nodes
+type Communication interface {
+	Listen(config Config) (map[string][]net.Addr, chan string, chan string, error)
+	SetupAndFireBroadcast(config Config)
+}
+
 func checkError(err error) {
 	if err != nil {
 		log.Fatal("Error: ", err)
@@ -89,13 +122,18 @@ func listenForMessage(port int, address *net.Addr, channel chan string) {
 		log.Println("Received ", message, " from ", addr)
 		channel <- message
 		if err != nil {
-			fmt.Println("Error: ", err)
+			log.Println("Error: ", err)
 		}
 	}
 }
 
-// ListenForMessages will bind to the port in UDP and listen for messages from peers
-func Listen(port int) (map[string][]net.Addr, chan string, chan string, error) {
+// UDPCommunication is a concrete implementation of Communication interface
+type _UDPCommunication struct {
+}
+
+// Listen will bind to the port in UDP and listen for messages from peers
+func (comm _UDPCommunication) Listen(config Config) (map[string][]net.Addr, chan string, chan string, error) {
+	port := config.GetPort()
 	listeners := make(map[string][]net.Addr)
 	interfaces, err := net.Interfaces()
 	messageChannel := make(chan string)
@@ -133,7 +171,13 @@ func Listen(port int) (map[string][]net.Addr, chan string, chan string, error) {
 	return listeners, messageChannel, broadcastChannel, nil
 }
 
-// Broadcast will multicast the existence of this client to the world
-func Broadcast() {
+// SetupAndFireBroadcast will multicast the existence of this client to the world in an orderly
+// fashion
+func (comm _UDPCommunication) SetupAndFireBroadcast(config Config) {
 
+}
+
+// NewUDPCommunication returns UDP implementation of communication for the application
+func NewUDPCommunication() Communication {
+	return _UDPCommunication{}
 }

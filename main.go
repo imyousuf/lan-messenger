@@ -30,12 +30,14 @@ func main() {
 	} else {
 		log.Fatal("Error getting interfaces", err)
 	}
-	listeners, messageChannel, broadcastChannel, _ := network.Listen(30000)
+	udpComm := network.NewUDPCommunication()
+	config := network.NewConfig(30000)
+	listeners, messageChannel, broadcastChannel, _ := udpComm.Listen(config)
 	log.Println("Listening to: ", listeners)
 	completeNotificationChannel := make(chan int)
 	go broadcastHandler(broadcastChannel, completeNotificationChannel)
 	go messageHandler(messageChannel, completeNotificationChannel)
-	network.Broadcast()
+	udpComm.SetupAndFireBroadcast(config)
 	<-completeNotificationChannel
 	<-completeNotificationChannel
 
