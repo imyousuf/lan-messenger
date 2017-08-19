@@ -34,11 +34,52 @@ func NewConfig(port int) Config {
 	return _Config{Port: port, Interfaces: make([]string, 0, 0)}
 }
 
+// MessageEvent is the event interface that MessageListener should expect
+type MessageEvent interface {
+	GetMessage() string
+}
+
+// MessageListener is the Interface that Communication accepts to notify of messages received
+type MessageListener interface {
+	HandleMessageReceived(event MessageEvent)
+	HandleEndOfMessages()
+}
+
+// BroadcastEvent is the event interface that BroadcastListener should expect
+type BroadcastEvent interface {
+	GetBroadcastMessage() string
+}
+
+// BroadcastListener is the Interface that Communication accepts to notify of broadcasts received
+type BroadcastListener interface {
+	HandleBroadcastReceived(event BroadcastEvent)
+	HandleEndOfBroadcasts()
+}
+
+type _MessageEvent struct {
+	message string
+}
+
+func (me _MessageEvent) GetMessage() string {
+	return me.message
+}
+
+type _BroadcastEvent struct {
+	broadcastMessage string
+}
+
+func (be _BroadcastEvent) GetBroadcastMessage() string {
+	return be.broadcastMessage
+}
+
 // Communication defines the interface the application uses to communicate between
 // nodes
 type Communication interface {
-	Listen(config Config) (map[string][]net.Addr, chan string, chan string, error)
-	SetupAndFireBroadcast(config Config)
+	SetupCommunication(config Config)
+	AddMessageListener(listener MessageListener) bool
+	RemoveMessageListener(listener MessageListener) bool
+	AddBroadcastListener(listener BroadcastListener) bool
+	RemoveBroadcastListener(listener BroadcastListener) bool
 }
 
 func checkError(err error) {
@@ -129,10 +170,15 @@ func listenForMessage(port int, address *net.Addr, channel chan string) {
 
 // UDPCommunication is a concrete implementation of Communication interface
 type _UDPCommunication struct {
+	listeners          map[string][]net.Addr
+	messageChannel     chan string
+	broadcastChannel   chan string
+	listenError        error
+	messageListeners   []MessageListener
+	broadcastListeners []BroadcastListener
 }
 
-// Listen will bind to the port in UDP and listen for messages from peers
-func (comm _UDPCommunication) Listen(config Config) (map[string][]net.Addr, chan string, chan string, error) {
+func (comm _UDPCommunication) listen(config Config) {
 	port := config.GetPort()
 	listeners := make(map[string][]net.Addr)
 	interfaces, err := net.Interfaces()
@@ -166,15 +212,93 @@ func (comm _UDPCommunication) Listen(config Config) (map[string][]net.Addr, chan
 		// Since nothing will be listened to just close them
 		close(messageChannel)
 		close(broadcastChannel)
-		return listeners, messageChannel, broadcastChannel, err
 	}
-	return listeners, messageChannel, broadcastChannel, nil
+	comm.listeners = listeners
+	comm.messageChannel = messageChannel
+	comm.broadcastChannel = broadcastChannel
+	comm.listenError = err
+	go comm.handleRawMessages()
+	go comm.handleRawBroadcasts()
 }
 
-// SetupAndFireBroadcast will multicast the existence of this client to the world in an orderly
-// fashion
-func (comm _UDPCommunication) SetupAndFireBroadcast(config Config) {
+func (comm _UDPCommunication) handleRawMessages() {
+	for message := range comm.messageChannel {
+		event := _MessageEvent{message: message}
+		for _, listener := range comm.messageListeners {
+			listener.HandleMessageReceived(event)
+		}
+	}
+	for _, listener := range comm.messageListeners {
+		listener.HandleEndOfMessages()
+	}
+}
 
+func (comm _UDPCommunication) handleRawBroadcasts() {
+	for message := range comm.broadcastChannel {
+		event := _BroadcastEvent{broadcastMessage: message}
+		for _, listener := range comm.broadcastListeners {
+			listener.HandleBroadcastReceived(event)
+		}
+	}
+	for _, listener := range comm.broadcastListeners {
+		listener.HandleEndOfBroadcasts()
+	}
+}
+
+// SetupCommunication will multicast the existence of this client to the world in an orderly
+// fashion
+func (comm _UDPCommunication) SetupCommunication(config Config) {
+	comm.listen(config)
+}
+
+func (comm _UDPCommunication) AddMessageListener(listener MessageListener) bool {
+	oldLen := len(comm.messageListeners)
+	comm.messageListeners = append(comm.messageListeners, listener)
+	return oldLen == len(comm.messageListeners)
+}
+
+func (comm _UDPCommunication) RemoveMessageListener(listener MessageListener) bool {
+	oldLen := len(comm.messageListeners)
+	itemIndex := -1
+	for index, mListener := range comm.messageListeners {
+		if mListener == listener {
+			itemIndex = index
+			break
+		}
+	}
+	if itemIndex >= 0 {
+		if itemIndex < oldLen-1 {
+			copy(comm.messageListeners[itemIndex:], comm.messageListeners[itemIndex+1:])
+			comm.messageListeners[oldLen-1] = nil
+		}
+		comm.messageListeners = comm.messageListeners[:oldLen-1]
+	}
+	return oldLen > len(comm.messageListeners)
+}
+
+func (comm _UDPCommunication) AddBroadcastListener(listener BroadcastListener) bool {
+	oldLen := len(comm.broadcastListeners)
+	comm.broadcastListeners = append(comm.broadcastListeners, listener)
+	return oldLen == len(comm.broadcastListeners)
+}
+
+func (comm _UDPCommunication) RemoveBroadcastListener(listener BroadcastListener) bool {
+	oldLen := len(comm.broadcastListeners)
+	itemIndex := -1
+	for index, mListener := range comm.broadcastListeners {
+		if mListener == listener {
+			itemIndex = index
+			break
+		}
+	}
+	if itemIndex >= 0 {
+		if itemIndex < oldLen-1 {
+			copy(comm.broadcastListeners[itemIndex:], comm.broadcastListeners[itemIndex+1:])
+			comm.broadcastListeners[oldLen-1] = nil
+		}
+		comm.broadcastListeners = comm.broadcastListeners[:oldLen-1]
+	}
+	return oldLen > len(comm.broadcastListeners)
 }
 
 // NewUDPCommunication returns UDP implementation of communication for the application

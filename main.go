@@ -4,18 +4,26 @@ import "net"
 import "log"
 import "github.com/imyousuf/lan-messenger/network"
 
-func messageHandler(messageChannel chan string, completeNotificationChannel chan int) {
-	for message := range messageChannel {
-		log.Println(message)
-	}
-	completeNotificationChannel <- 1
+type _MessageListener struct {
+	completeNotificationChannel chan int
 }
 
-func broadcastHandler(broadcastChannel chan string, completeNotificationChannel chan int) {
-	for message := range broadcastChannel {
-		log.Println(message)
-	}
-	completeNotificationChannel <- 1
+func (me _MessageListener) HandleMessageReceived(event network.MessageEvent) {
+	log.Println(event.GetMessage())
+}
+func (me _MessageListener) HandleEndOfMessages() {
+	me.completeNotificationChannel <- 1
+}
+
+type _BroadcastListener struct {
+	completeNotificationChannel chan int
+}
+
+func (be _BroadcastListener) HandleBroadcastReceived(event network.BroadcastEvent) {
+	log.Println(event.GetBroadcastMessage())
+}
+func (be _BroadcastListener) HandleEndOfBroadcasts() {
+	be.completeNotificationChannel <- 2
 }
 
 func main() {
@@ -30,14 +38,14 @@ func main() {
 	} else {
 		log.Fatal("Error getting interfaces", err)
 	}
+	completeNotificationChannel := make(chan int)
+	messageListener := _MessageListener{completeNotificationChannel: completeNotificationChannel}
+	broadcastListener := _BroadcastListener{completeNotificationChannel: completeNotificationChannel}
 	udpComm := network.NewUDPCommunication()
 	config := network.NewConfig(30000)
-	listeners, messageChannel, broadcastChannel, _ := udpComm.Listen(config)
-	log.Println("Listening to: ", listeners)
-	completeNotificationChannel := make(chan int)
-	go broadcastHandler(broadcastChannel, completeNotificationChannel)
-	go messageHandler(messageChannel, completeNotificationChannel)
-	udpComm.SetupAndFireBroadcast(config)
+	udpComm.AddMessageListener(&messageListener)
+	udpComm.AddBroadcastListener(&broadcastListener)
+	udpComm.SetupCommunication(config)
 	<-completeNotificationChannel
 	<-completeNotificationChannel
 
