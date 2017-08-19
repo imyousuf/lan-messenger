@@ -31,8 +31,12 @@ type MessageEvent interface {
 	GetMessage() string
 }
 
+type iListener interface {
+}
+
 // MessageListener is the Interface that Communication accepts to notify of messages received
 type MessageListener interface {
+	iListener
 	HandleMessageReceived(event MessageEvent)
 	HandleEndOfMessages()
 }
@@ -44,6 +48,7 @@ type BroadcastEvent interface {
 
 // BroadcastListener is the Interface that Communication accepts to notify of broadcasts received
 type BroadcastListener interface {
+	iListener
 	HandleBroadcastReceived(event BroadcastEvent)
 	HandleEndOfBroadcasts()
 }
@@ -72,4 +77,33 @@ type Communication interface {
 	RemoveMessageListener(listener MessageListener) bool
 	AddBroadcastListener(listener BroadcastListener) bool
 	RemoveBroadcastListener(listener BroadcastListener) bool
+}
+
+func containsBroadcastListener(bList []BroadcastListener, bItem BroadcastListener) int {
+	oldLen := len(bList)
+	listeners := make([]iListener, oldLen, oldLen)
+	for index, bListener := range bList {
+		listeners[index] = bListener
+	}
+	return contains(listeners, bItem)
+}
+
+func containsMessageListener(mList []MessageListener, mItem MessageListener) int {
+	oldLen := len(mList)
+	listeners := make([]iListener, oldLen, oldLen)
+	for index, mListener := range mList {
+		listeners[index] = mListener
+	}
+	return contains(listeners, mItem)
+}
+
+func contains(list []iListener, item iListener) int {
+	itemIndex := -1
+	for index, iItem := range list {
+		if iItem == item {
+			itemIndex = index
+			break
+		}
+	}
+	return itemIndex
 }
