@@ -77,6 +77,7 @@ type Communication interface {
 	RemoveMessageListener(listener MessageListener) bool
 	AddBroadcastListener(listener BroadcastListener) bool
 	RemoveBroadcastListener(listener BroadcastListener) bool
+	CloseCommunication()
 }
 
 func containsBroadcastListener(bList []BroadcastListener, bItem BroadcastListener) int {

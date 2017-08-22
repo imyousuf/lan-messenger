@@ -1,8 +1,13 @@
 package main
 
-import "net"
-import "log"
-import "github.com/imyousuf/lan-messenger/network"
+import (
+	"log"
+	"net"
+	"os"
+	"os/signal"
+
+	"github.com/imyousuf/lan-messenger/network"
+)
 
 type _MessageListener struct {
 	completeNotificationChannel chan int
@@ -26,6 +31,15 @@ func (be _BroadcastListener) HandleEndOfBroadcasts() {
 	be.completeNotificationChannel <- 2
 }
 
+func exit(udpComm network.Communication) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		udpComm.CloseCommunication()
+	}()
+}
+
 func main() {
 	interfaces, err := net.Interfaces()
 	if err == nil {
@@ -43,10 +57,10 @@ func main() {
 	broadcastListener := _BroadcastListener{completeNotificationChannel: completeNotificationChannel}
 	udpComm := network.NewUDPCommunication()
 	config := network.NewConfig(30000)
+	exit(udpComm)
 	udpComm.AddMessageListener(&messageListener)
 	udpComm.AddBroadcastListener(&broadcastListener)
 	udpComm.SetupCommunication(config)
 	<-completeNotificationChannel
 	<-completeNotificationChannel
-
 }

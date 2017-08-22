@@ -249,6 +249,12 @@ func (comm *_UDPCommunication) SetupCommunication(config Config) {
 	}
 }
 
+func (comm _UDPCommunication) CloseCommunication() {
+	log.Println("Closing listener channels")
+	close(comm.messageChannel)
+	close(comm.broadcastChannel)
+}
+
 // NewUDPCommunication returns UDP implementation of communication for the application
 func NewUDPCommunication() Communication {
 	return &_UDPCommunication{}
