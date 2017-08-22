@@ -68,13 +68,18 @@ func PrintIPv4Addresses(netInterface net.Interface, unicast bool) {
 
 }
 
-func listenForMessage(port int, address *net.Addr, channel chan string) {
+func getHostPortFromNetAddr(port int, address *net.Addr) string {
 	addrStr := (*address).String()
 	endIndex := strings.Index(addrStr, "/")
 	if endIndex < 1 {
 		endIndex = len(addrStr)
 	}
-	serverListeningStr := addrStr[0:endIndex] + ":" + strconv.Itoa(port)
+	listeningStr := addrStr[0:endIndex] + ":" + strconv.Itoa(port)
+	return listeningStr
+}
+
+func listenForMessage(port int, address *net.Addr, channel chan string) {
+	serverListeningStr := getHostPortFromNetAddr(port, address)
 	// Copied from https://varshneyabhi.wordpress.com/2014/12/23/simple-udp-clientserver-in-golang/
 	ServerAddr, err := net.ResolveUDPAddr("udp", serverListeningStr)
 	ServerConn, err := net.ListenUDP("udp", ServerAddr)
@@ -94,9 +99,23 @@ func listenForMessage(port int, address *net.Addr, channel chan string) {
 	}
 }
 
+type _ListenerConfig struct {
+	port       int
+	unicasts   []net.Addr
+	multicasts []net.Addr
+}
+
+func (lc _ListenerConfig) GetResolvedUnicastAddr() *net.UDPAddr {
+	if len(lc.unicasts) < 1 {
+		return nil
+	}
+	udpAddr, _ := net.ResolveUDPAddr("udp", getHostPortFromNetAddr(lc.port, &lc.unicasts[0]))
+	return udpAddr
+}
+
 // UDPCommunication is a concrete implementation of Communication interface
 type _UDPCommunication struct {
-	listeners          map[string][]net.Addr
+	listeners          map[string]_ListenerConfig
 	messageChannel     chan string
 	broadcastChannel   chan string
 	messageListeners   []MessageListener
@@ -173,7 +192,7 @@ func (comm *_UDPCommunication) RemoveBroadcastListener(listener BroadcastListene
 
 func (comm *_UDPCommunication) listen(config Config) error {
 	port := config.GetPort()
-	listeners := make(map[string][]net.Addr)
+	listeners := make(map[string]_ListenerConfig)
 	interfaces, err := net.Interfaces()
 	messageChannel := make(chan string)
 	broadcastChannel := make(chan string)
@@ -182,24 +201,22 @@ func (comm *_UDPCommunication) listen(config Config) error {
 			if isInterfaceIgnorable(netInterface) {
 				continue
 			}
-			var listeningToAddresses []net.Addr
 			// Loop for message interfaces
 			addresses := getUpIPV4Addresses(netInterface, true)
 			for _, address := range addresses {
 				go listenForMessage(port, &address, messageChannel)
-				listeningToAddresses = append(listeningToAddresses, address)
 			}
 			// Loop for broadcast interfaces but listen to the next port from
 			// the port requested for
 			mAddresses := getUpIPV4Addresses(netInterface, false)
 			for _, address := range mAddresses {
 				go listenForMessage(port+1, &address, broadcastChannel)
-				listeningToAddresses = append(listeningToAddresses, address)
 			}
-			//Add if listening to any interface
-			if len(listeningToAddresses) > 0 {
-				listeners[netInterface.Name] = listeningToAddresses
-			}
+			//Add _ListenerConfig
+			listeners[netInterface.Name] = _ListenerConfig{
+				unicasts:   addresses,
+				multicasts: mAddresses,
+				port:       port}
 		}
 	} else {
 		// Since nothing will be listened to just close them
@@ -214,10 +231,19 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	return err
 }
 
+func (comm _UDPCommunication) broadcast(config Config) error {
+	var err error
+	return err
+}
+
 // SetupCommunication will multicast the existence of this client to the world in an orderly
 // fashion
 func (comm *_UDPCommunication) SetupCommunication(config Config) {
 	err := comm.listen(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = comm.broadcast(config)
 	if err != nil {
 		log.Fatal(err)
 	}
