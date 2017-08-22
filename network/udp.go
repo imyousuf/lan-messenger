@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func checkError(err error) {
@@ -109,8 +110,46 @@ func (lc _ListenerConfig) GetResolvedUnicastAddr() *net.UDPAddr {
 	if len(lc.unicasts) < 1 {
 		return nil
 	}
-	udpAddr, _ := net.ResolveUDPAddr("udp", getHostPortFromNetAddr(lc.port, &lc.unicasts[0]))
-	return udpAddr
+	udpAddr, err := net.ResolveUDPAddr("udp", getHostPortFromNetAddr(lc.port, &lc.unicasts[0]))
+	if err == nil {
+		return udpAddr
+	}
+	return nil
+}
+
+func (lc _ListenerConfig) getResolvedBroadcastReceiverAddr() *net.UDPAddr {
+	if len(lc.unicasts) < 1 {
+		return nil
+	}
+	udpAddr, err := net.ResolveUDPAddr("udp", getHostPortFromNetAddr(lc.port+2, &lc.unicasts[0]))
+	if err == nil {
+		return udpAddr
+	}
+	return nil
+}
+
+func (lc _ListenerConfig) GetMultiCastConnections() []*net.UDPConn {
+	receiver := lc.getResolvedBroadcastReceiverAddr()
+	if receiver == nil {
+		log.Println("No unicast address for this interface")
+		return make([]*net.UDPConn, 0)
+	}
+	connections := make([]*net.UDPConn, 0, len(lc.multicasts))
+	for _, mAddress := range lc.multicasts {
+		udpAddr, err := net.ResolveUDPAddr("udp", getHostPortFromNetAddr(lc.port+1, &mAddress))
+		if err == nil {
+			conn, err := net.DialUDP("udp", receiver, udpAddr)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			connections = connections[:len(connections)+1]
+			connections[len(connections)-1] = conn
+		} else {
+			log.Println(err)
+		}
+	}
+	return connections
 }
 
 // UDPCommunication is a concrete implementation of Communication interface
@@ -120,6 +159,7 @@ type _UDPCommunication struct {
 	broadcastChannel   chan string
 	messageListeners   []MessageListener
 	broadcastListeners []BroadcastListener
+	pingQuit           chan int
 }
 
 func (comm *_UDPCommunication) handleRawMessages() {
@@ -231,8 +271,45 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	return err
 }
 
-func (comm _UDPCommunication) broadcast(config Config) error {
+func (comm _UDPCommunication) broadcastMessage(message string) {
+	for _, listener := range comm.listeners {
+		for _, connection := range listener.GetMultiCastConnections() {
+			buf := []byte(message)
+			_, err := connection.Write(buf)
+			if err != nil {
+				log.Println(err)
+			}
+			connection.Close()
+		}
+	}
+}
+
+func (comm _UDPCommunication) broadcastJoin() {
+	comm.broadcastMessage("hello!")
+}
+
+func (comm *_UDPCommunication) setupPingBroadcast() {
+	ticker := time.NewTicker(30 * time.Second)
+	comm.pingQuit = make(chan int)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				comm.broadcastJoin()
+			case <-comm.pingQuit:
+				ticker.Stop()
+				comm.pingQuit <- 1
+				return
+			}
+		}
+	}()
+}
+
+func (comm *_UDPCommunication) broadcast(config Config) error {
+	log.Println("Sending initial broadcasts")
 	var err error
+	comm.broadcastJoin()
+	comm.setupPingBroadcast()
 	return err
 }
 
@@ -251,8 +328,10 @@ func (comm *_UDPCommunication) SetupCommunication(config Config) {
 
 func (comm _UDPCommunication) CloseCommunication() {
 	log.Println("Closing listener channels")
+	comm.pingQuit <- 1
 	close(comm.messageChannel)
 	close(comm.broadcastChannel)
+	<-comm.pingQuit
 }
 
 // NewUDPCommunication returns UDP implementation of communication for the application
