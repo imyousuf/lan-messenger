@@ -131,7 +131,6 @@ func (lc _ListenerConfig) getResolvedBroadcastReceiverAddr() *net.UDPAddr {
 func (lc _ListenerConfig) GetMultiCastConnections() []*net.UDPConn {
 	receiver := lc.getResolvedBroadcastReceiverAddr()
 	if receiver == nil {
-		log.Println("No unicast address for this interface")
 		return make([]*net.UDPConn, 0)
 	}
 	connections := make([]*net.UDPConn, 0, len(lc.multicasts))
@@ -230,6 +229,19 @@ func (comm *_UDPCommunication) RemoveBroadcastListener(listener BroadcastListene
 	return oldLen > len(comm.broadcastListeners)
 }
 
+func isListenable(netInterface net.Interface, config Config) bool {
+	if len(config.GetInterfaces()) > 0 {
+		isListenable := true
+		for _, interfaceName := range config.GetInterfaces() {
+			if netInterface.Name != interfaceName {
+				isListenable = false
+			}
+		}
+		return isListenable
+	}
+	return true
+}
+
 func (comm *_UDPCommunication) listen(config Config) error {
 	port := config.GetPort()
 	listeners := make(map[string]_ListenerConfig)
@@ -239,6 +251,9 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	if err == nil {
 		for _, netInterface := range interfaces {
 			if isInterfaceIgnorable(netInterface) {
+				continue
+			}
+			if !isListenable(netInterface, config) {
 				continue
 			}
 			// Loop for message interfaces
@@ -252,7 +267,7 @@ func (comm *_UDPCommunication) listen(config Config) error {
 			for _, address := range mAddresses {
 				go listenForMessage(port+1, &address, broadcastChannel)
 			}
-			//Add _ListenerConfig
+			// Add _ListenerConfig
 			listeners[netInterface.Name] = _ListenerConfig{
 				unicasts:   addresses,
 				multicasts: mAddresses,

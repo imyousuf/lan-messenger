@@ -22,8 +22,8 @@ func (conf _Config) GetPort() int {
 
 // NewConfig initializes and returns a network configuration to be used for listening and
 // broadcasting
-func NewConfig(port int) Config {
-	return _Config{Port: port, Interfaces: make([]string, 0, 0)}
+func NewConfig(port int, interfaceName string) Config {
+	return _Config{Port: port, Interfaces: []string{interfaceName}}
 }
 
 // MessageEvent is the event interface that MessageListener should expect

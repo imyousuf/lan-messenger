@@ -1,0 +1,8 @@
+[network]
+port=30000
+interface=wlan0
+
+[profile]
+username=someusername
+email=some@email.co
+displayname=Some One
