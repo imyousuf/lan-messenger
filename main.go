@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/go-ini/ini"
 	"github.com/imyousuf/lan-messenger/network"
 )
 
@@ -39,34 +38,6 @@ func exit(udpComm network.Communication) {
 		<-c
 		udpComm.CloseCommunication()
 	}()
-}
-
-func getNetworkConfig() (int, string) {
-	cfg, err := ini.InsensitiveLoad("lamess.cfg")
-	if err != nil {
-		log.Fatal(err)
-	}
-	section, sErr := cfg.GetSection("network")
-	if sErr != nil {
-		log.Fatal(sErr)
-	}
-	sPort, pErr := section.GetKey("port")
-	port := 0
-	if pErr == nil {
-		port, _ = sPort.Int()
-	}
-	if port <= 0 {
-		port = 30000
-	}
-	sInterfaceName, iErr := section.GetKey("interface")
-	interfaceName := ""
-	if iErr == nil {
-		interfaceName = sInterfaceName.String()
-	}
-	if len(interfaceName) <= 0 {
-		interfaceName = "wlan0"
-	}
-	return port, interfaceName
 }
 
 func main() {

@@ -6,3 +6,6 @@ interface=wlan0
 username=someusername
 email=some@email.co
 displayname=Some One
+
+[device]
+deviceindex=1
