@@ -21,6 +21,23 @@ func TestIsStringAlphaNumeric(t *testing.T) {
 	}
 }
 
+func TestIsStringAlphaNumericWithSpace(t *testing.T) {
+	successCases := []string{"A1", "a a", "11 A", "A1a", "AA"}
+	for _, successCase := range successCases {
+		if !IsStringAlphaNumericWithSpace(successCase) {
+			t.Error("Should pass as Alphanumeric: ", successCase)
+			t.Fail()
+		}
+	}
+	failCases := []string{"A$a", "9( o", "99.8"}
+	for _, failCase := range failCases {
+		if IsStringAlphaNumericWithSpace(failCase) {
+			t.Error("Should not pass as Alphanumeric: ", failCase)
+			t.Fail()
+		}
+	}
+}
+
 func TestIsStringValidEmailFormat(t *testing.T) {
 	successCases := []string{"aa@aa", "aa@a.com", "a+1@asd.co"}
 	for _, successCase := range successCases {

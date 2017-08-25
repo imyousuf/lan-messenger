@@ -13,6 +13,7 @@ const (
 
 var (
 	isAlphaNumeric          = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
+	isAlphaNumericWithSpace = regexp.MustCompile(`^[a-zA-Z0-9 ]+$`).MatchString
 	isValidEmailString      = regexp.MustCompile(emailRegex).MatchString
 	isValidIPAddress        = regexp.MustCompile(ipAddressRegex).MatchString
 	isValidConnectionString = regexp.MustCompile(ipAddressRegex[:len(ipAddressRegex)-1] + "[:][0-9]+$").MatchString
@@ -21,6 +22,12 @@ var (
 // IsStringAlphaNumeric checks whether the passed String is a alpha numeric only
 func IsStringAlphaNumeric(String string) bool {
 	return isAlphaNumeric(String)
+}
+
+// IsStringAlphaNumericWithSpace checks whether the passed String is a alpha numeric
+// with space allowed only
+func IsStringAlphaNumericWithSpace(String string) bool {
+	return isAlphaNumericWithSpace(String)
 }
 
 // IsStringValidEmailFormat checks for valid email format
