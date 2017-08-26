@@ -3,6 +3,7 @@ package network
 import (
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/imyousuf/lan-messenger/packet"
@@ -17,14 +18,15 @@ const (
 
 // UDPCommunication is a concrete implementation of Communication interface
 type _UDPCommunication struct {
-	listeners          map[string]_ListenerConfig
-	messageChannel     chan []byte
-	broadcastChannel   chan []byte
-	messageListeners   []MessageListener
-	broadcastListeners []BroadcastListener
-	pingQuit           chan int
-	selfProfile        profile.UserProfile
-	sessionRegistry    map[string]_RegistryEntry
+	listeners            map[string]_ListenerConfig
+	messageChannel       chan []byte
+	broadcastChannel     chan []byte
+	messageListeners     []MessageListener
+	broadcastListeners   []BroadcastListener
+	pingQuit             chan int
+	selfProfile          profile.UserProfile
+	sessionRegistry      map[string]_RegistryEntry
+	sessionRegistryMutex *sync.Mutex
 }
 
 func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
@@ -32,6 +34,8 @@ func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
 	if utils.IsStringBlank(sessionID) {
 		return false
 	}
+	comm.sessionRegistryMutex.Lock()
+	defer comm.sessionRegistryMutex.Unlock()
 	if registryEntry, ok := comm.sessionRegistry[sessionID]; ok {
 		if _, packetExists := registryEntry.packetRegistry[packetID]; packetExists {
 			registryEntry.packetRegistry[packetID]++
@@ -49,11 +53,16 @@ func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
 
 func (comm *_UDPCommunication) renewRegistryEntry(event PingEvent) {
 	sessionID, _ := event.GetEventIdentifier()
-	registryEntry := comm.sessionRegistry[sessionID]
-	registryEntry.expiryTime = event.GetPingPacket().GetExpiryTime()
+	comm.sessionRegistryMutex.Lock()
+	defer comm.sessionRegistryMutex.Unlock()
+	if registryEntry, ok := comm.sessionRegistry[sessionID]; ok {
+		registryEntry.expiryTime = event.GetPingPacket().GetExpiryTime()
+	}
 }
 
 func (comm *_UDPCommunication) cleanExpiredRegistryEntries() {
+	comm.sessionRegistryMutex.Lock()
+	defer comm.sessionRegistryMutex.Unlock()
 	for sessionID, registryEvent := range comm.sessionRegistry {
 		now := time.Now()
 		if registryEvent.expiryTime.Before(now) {
@@ -336,6 +345,7 @@ func (comm *_UDPCommunication) addInternalListeners() {
 // NewUDPCommunication returns UDP implementation of communication for the application
 func NewUDPCommunication() Communication {
 	comm := &_UDPCommunication{}
+	comm.sessionRegistryMutex = &sync.Mutex{}
 	comm.addInternalListeners()
 	return comm
 }
