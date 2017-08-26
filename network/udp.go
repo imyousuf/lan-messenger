@@ -6,10 +6,12 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
+	"github.com/imyousuf/lan-messenger/utils"
 )
 
 const (
@@ -87,20 +89,20 @@ func getHostPortFromNetAddr(port int, address *net.Addr) string {
 	return listeningStr
 }
 
-func listenForMessage(port int, address *net.Addr, channel chan string) {
+func listenForMessage(port int, address *net.Addr, channel chan []byte) {
 	serverListeningStr := getHostPortFromNetAddr(port, address)
 	// Copied from https://varshneyabhi.wordpress.com/2014/12/23/simple-udp-clientserver-in-golang/
 	ServerAddr, err := net.ResolveUDPAddr("udp", serverListeningStr)
 	ServerConn, err := net.ListenUDP("udp", ServerAddr)
 	checkError(err)
 	defer ServerConn.Close()
-
-	buf := make([]byte, 1024)
+	// FIXME: We will need to track for packets larger than 10KB
+	buf := make([]byte, 1024*10)
 
 	for {
 		n, addr, err := ServerConn.ReadFromUDP(buf)
-		message := string(buf[0:n])
-		log.Println("Received ", message, " from ", addr)
+		message := buf[0:n]
+		log.Println("Received ", string(message), " from ", addr)
 		channel <- message
 		if err != nil {
 			log.Println("Error: ", err)
@@ -159,20 +161,69 @@ func (lc _ListenerConfig) GetMultiCastConnections() []*net.UDPConn {
 	return connections
 }
 
+type _RegistryEntry struct {
+	expiryTime     time.Time
+	packetRegistry map[uint64]uint8
+}
+
+func newRegistryEntry(event RegisterEvent) _RegistryEntry {
+	entry := _RegistryEntry{}
+	entry.expiryTime = event.GetRegisterPacket().GetExpiryTime()
+	entry.packetRegistry = make(map[uint64]uint8)
+	entry.packetRegistry[event.GetRegisterPacket().GetPacketID()] = 1
+	return entry
+}
+
 // UDPCommunication is a concrete implementation of Communication interface
 type _UDPCommunication struct {
 	listeners          map[string]_ListenerConfig
-	messageChannel     chan string
-	broadcastChannel   chan string
+	messageChannel     chan []byte
+	broadcastChannel   chan []byte
 	messageListeners   []MessageListener
 	broadcastListeners []BroadcastListener
 	pingQuit           chan int
 	selfProfile        profile.UserProfile
+	sessionRegistry    map[string]_RegistryEntry
+}
+
+func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
+	sessionID, packetID := event.GetEventIdentifier()
+	if utils.IsStringBlank(sessionID) {
+		return false
+	}
+	if registryEntry, ok := comm.sessionRegistry[sessionID]; ok {
+		if _, packetExists := registryEntry.packetRegistry[packetID]; packetExists {
+			registryEntry.packetRegistry[packetID]++
+			return false
+		}
+		registryEntry.packetRegistry[packetID] = 1
+		return true
+	} else if registerEvent, eventOk := event.(RegisterEvent); eventOk {
+		comm.sessionRegistry[sessionID] = newRegistryEntry(registerEvent)
+		return true
+	} else {
+		return false
+	}
+}
+
+func (comm *_UDPCommunication) renewRegistryEntry(event PingEvent) {
+	sessionID, _ := event.GetEventIdentifier()
+	registryEntry := comm.sessionRegistry[sessionID]
+	registryEntry.expiryTime = event.GetPingPacket().GetExpiryTime()
+}
+
+func (comm *_UDPCommunication) cleanExpiredRegistryEntries() {
+	for sessionID, registryEvent := range comm.sessionRegistry {
+		now := time.Now()
+		if registryEvent.expiryTime.Before(now) {
+			delete(comm.sessionRegistry, sessionID)
+		}
+	}
 }
 
 func (comm *_UDPCommunication) handleRawMessages() {
 	for message := range comm.messageChannel {
-		event := _MessageEvent{message: message}
+		event := _MessageEvent{message: string(message)}
 		for _, listener := range comm.messageListeners {
 			listener.HandleMessageReceived(event)
 		}
@@ -184,9 +235,25 @@ func (comm *_UDPCommunication) handleRawMessages() {
 
 func (comm *_UDPCommunication) handleRawBroadcasts() {
 	for message := range comm.broadcastChannel {
-		event := _BroadcastEvent{broadcastMessage: message}
-		for _, listener := range comm.broadcastListeners {
-			listener.HandleBroadcastReceived(event)
+		event := createEventFromEventData(message)
+		if comm.isNotDuplicate(event) {
+			var once sync.Once
+			for _, listener := range comm.broadcastListeners {
+				switch event.(type) {
+				case RegisterEvent:
+					listener.HandleRegisterEvent(event.(RegisterEvent))
+				case PingEvent:
+					pingEvent := event.(PingEvent)
+					once.Do(func() {
+						comm.renewRegistryEntry(pingEvent)
+					})
+					listener.HandlePingEvent(pingEvent)
+				case SignOffEvent:
+					listener.HandleSignOffEvent(event.(SignOffEvent))
+				default:
+					panic("Event type not supported for broadcast consumption")
+				}
+			}
 		}
 	}
 	for _, listener := range comm.broadcastListeners {
@@ -255,8 +322,8 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	port := config.GetPort()
 	listeners := make(map[string]_ListenerConfig)
 	interfaces, err := net.Interfaces()
-	messageChannel := make(chan string)
-	broadcastChannel := make(chan string)
+	messageChannel := make(chan []byte)
+	broadcastChannel := make(chan []byte)
 	if err == nil {
 		for _, netInterface := range interfaces {
 			if isInterfaceIgnorable(netInterface) {
@@ -334,6 +401,7 @@ func (comm _UDPCommunication) setupPingBroadcast() {
 			select {
 			case <-ticker.C:
 				comm.broadcastPing()
+				comm.cleanExpiredRegistryEntries()
 			case <-comm.pingQuit:
 				ticker.Stop()
 				comm.pingQuit <- 1
@@ -360,6 +428,7 @@ func (comm *_UDPCommunication) InitCommunication(profile profile.UserProfile) er
 // SetupCommunication will multicast the existence of this client to the world in an orderly
 // fashion
 func (comm *_UDPCommunication) SetupCommunication(config Config) {
+	comm.sessionRegistry = make(map[string]_RegistryEntry)
 	err := comm.listen(config)
 	if err != nil {
 		log.Fatal(err)

@@ -43,15 +43,12 @@ type MessageListener interface {
 	HandleEndOfMessages()
 }
 
-// BroadcastEvent is the event interface that BroadcastListener should expect
-type BroadcastEvent interface {
-	GetBroadcastMessage() string
-}
-
 // BroadcastListener is the Interface that Communication accepts to notify of broadcasts received
 type BroadcastListener interface {
 	iListener
-	HandleBroadcastReceived(event BroadcastEvent)
+	HandleRegisterEvent(event RegisterEvent)
+	HandlePingEvent(event PingEvent)
+	HandleSignOffEvent(event SignOffEvent)
 	HandleEndOfBroadcasts()
 }
 
@@ -61,14 +58,6 @@ type _MessageEvent struct {
 
 func (me _MessageEvent) GetMessage() string {
 	return me.message
-}
-
-type _BroadcastEvent struct {
-	broadcastMessage string
-}
-
-func (be _BroadcastEvent) GetBroadcastMessage() string {
-	return be.broadcastMessage
 }
 
 // Communication defines the interface the application uses to communicate between

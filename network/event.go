@@ -19,6 +19,7 @@ const (
 type Event interface {
 	GetName() string
 	GetEventData() []byte
+	GetEventIdentifier() (string, uint64)
 }
 
 // RegisterEvent represents an event with RegisterPacket
@@ -52,6 +53,10 @@ func (event _Event) GetEventData() []byte {
 	return event.RawData
 }
 
+func (event _Event) GetEventIdentifier() (string, uint64) {
+	return "", 0
+}
+
 type _RegisterEvent struct {
 	_Event
 	packet packet.RegisterPacket
@@ -59,6 +64,10 @@ type _RegisterEvent struct {
 
 func (event _RegisterEvent) GetRegisterPacket() packet.RegisterPacket {
 	return event.packet
+}
+
+func (event _RegisterEvent) GetEventIdentifier() (string, uint64) {
+	return event.packet.GetSessionID(), event.packet.GetPacketID()
 }
 
 type _PingEvent struct {
@@ -70,6 +79,10 @@ func (event _PingEvent) GetPingPacket() packet.PingPacket {
 	return event.packet
 }
 
+func (event _PingEvent) GetEventIdentifier() (string, uint64) {
+	return event.packet.GetSessionID(), event.packet.GetPacketID()
+}
+
 type _SignOffEvent struct {
 	_Event
 	packet packet.SignOffPacket
@@ -77,6 +90,10 @@ type _SignOffEvent struct {
 
 func (event _SignOffEvent) GetSignOffPacket() packet.SignOffPacket {
 	return event.packet
+}
+
+func (event _SignOffEvent) GetEventIdentifier() (string, uint64) {
+	return event.packet.GetSessionID(), event.packet.GetPacketID()
 }
 
 // convertPacketToEventData converts a packet to a byte data format that can be transported

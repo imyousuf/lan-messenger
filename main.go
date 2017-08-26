@@ -10,26 +10,32 @@ import (
 	"github.com/imyousuf/lan-messenger/profile"
 )
 
-type _MessageListener struct {
+type _EventListener struct {
 	completeNotificationChannel chan int
 }
 
-func (me _MessageListener) HandleMessageReceived(event network.MessageEvent) {
+func (el _EventListener) HandleMessageReceived(event network.MessageEvent) {
 	log.Println(event.GetMessage())
 }
-func (me _MessageListener) HandleEndOfMessages() {
-	me.completeNotificationChannel <- 1
+
+func (el _EventListener) HandleRegisterEvent(event network.RegisterEvent) {
+	log.Println("Handled RE Broadcast: ", event.GetRegisterPacket().ToJSON())
 }
 
-type _BroadcastListener struct {
-	completeNotificationChannel chan int
+func (el _EventListener) HandlePingEvent(event network.PingEvent) {
+	log.Println("Handled PE Broadcast: ", event.GetPingPacket().ToJSON())
 }
 
-func (be _BroadcastListener) HandleBroadcastReceived(event network.BroadcastEvent) {
-	log.Println(event.GetBroadcastMessage())
+func (el _EventListener) HandleSignOffEvent(event network.SignOffEvent) {
+	log.Println("Handled SOE Broadcast: ", event.GetSignOffPacket().ToJSON())
 }
-func (be _BroadcastListener) HandleEndOfBroadcasts() {
-	be.completeNotificationChannel <- 2
+
+func (el _EventListener) HandleEndOfMessages() {
+	el.completeNotificationChannel <- 1
+}
+
+func (el _EventListener) HandleEndOfBroadcasts() {
+	el.completeNotificationChannel <- 2
 }
 
 func exit(udpComm network.Communication) {
@@ -54,13 +60,12 @@ func main() {
 		log.Fatal("Error getting interfaces", err)
 	}
 	completeNotificationChannel := make(chan int)
-	messageListener := _MessageListener{completeNotificationChannel: completeNotificationChannel}
-	broadcastListener := _BroadcastListener{completeNotificationChannel: completeNotificationChannel}
+	messageListener := _EventListener{completeNotificationChannel: completeNotificationChannel}
 	udpComm := network.NewUDPCommunication()
 	config := network.NewConfig(getNetworkConfig())
 	exit(udpComm)
 	udpComm.AddMessageListener(&messageListener)
-	udpComm.AddBroadcastListener(&broadcastListener)
+	udpComm.AddBroadcastListener(&messageListener)
 	udpComm.SetupCommunication(config)
 	udpComm.InitCommunication(profile.NewUserProfile(getUserProfile()))
 	<-completeNotificationChannel
