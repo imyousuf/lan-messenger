@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net"
 	"os"
 	"os/signal"
 
@@ -48,17 +47,6 @@ func exit(udpComm network.Communication) {
 }
 
 func main() {
-	interfaces, err := net.Interfaces()
-	if err == nil {
-		for _, netInterface := range interfaces {
-			// Unicast addresses
-			network.PrintIPv4Addresses(netInterface, true)
-			// Multicast addresses
-			network.PrintIPv4Addresses(netInterface, false)
-		}
-	} else {
-		log.Fatal("Error getting interfaces", err)
-	}
 	completeNotificationChannel := make(chan int)
 	messageListener := _EventListener{completeNotificationChannel: completeNotificationChannel}
 	udpComm := network.NewUDPCommunication()

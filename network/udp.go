@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -64,19 +63,17 @@ func isInterfaceIgnorable(netInterface net.Interface) bool {
 	return false
 }
 
-// PrintIPv4Addresses is a demo function
-// FIXME: Remove this function
-func PrintIPv4Addresses(netInterface net.Interface, unicast bool) {
-	netType := "Multicast"
-	if unicast {
-		netType = "Unicast"
+func isListenable(netInterface net.Interface, config Config) bool {
+	if len(config.GetInterfaces()) > 0 {
+		isListenable := true
+		for _, interfaceName := range config.GetInterfaces() {
+			if netInterface.Name != interfaceName {
+				isListenable = false
+			}
+		}
+		return isListenable
 	}
-	if isInterfaceIgnorable(netInterface) {
-		log.Println("Flags for ", netInterface.Name, " ", netInterface.Flags.String(), ", ", netInterface.HardwareAddr)
-		return
-	}
-	log.Println(netInterface.Name, fmt.Sprintf(" has %s addresses - ", netType), getUpIPV4Addresses(netInterface, unicast))
-
+	return true
 }
 
 func getHostPortFromNetAddr(port int, address *net.Addr) string {
@@ -303,19 +300,6 @@ func (comm *_UDPCommunication) RemoveBroadcastListener(listener BroadcastListene
 		comm.broadcastListeners = comm.broadcastListeners[:oldLen-1]
 	}
 	return oldLen > len(comm.broadcastListeners)
-}
-
-func isListenable(netInterface net.Interface, config Config) bool {
-	if len(config.GetInterfaces()) > 0 {
-		isListenable := true
-		for _, interfaceName := range config.GetInterfaces() {
-			if netInterface.Name != interfaceName {
-				isListenable = false
-			}
-		}
-		return isListenable
-	}
-	return true
 }
 
 func (comm *_UDPCommunication) listen(config Config) error {
