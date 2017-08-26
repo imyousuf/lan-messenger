@@ -14,7 +14,7 @@ type _EventListener struct {
 }
 
 func (el _EventListener) HandleMessageReceived(event network.MessageEvent) {
-	log.Println(event.GetMessage())
+	log.Println("MESSAGE: ", event.GetMessage())
 }
 
 func (el _EventListener) HandleRegisterEvent(event network.RegisterEvent) {

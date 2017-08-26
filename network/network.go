@@ -1,6 +1,9 @@
 package network
 
-import "github.com/imyousuf/lan-messenger/profile"
+import (
+	"github.com/imyousuf/lan-messenger/packet"
+	"github.com/imyousuf/lan-messenger/profile"
+)
 
 // Config represents configuration for the application to inform which interfaces
 // to listen and broadcast to and also which port to bind to.
@@ -69,34 +72,6 @@ type Communication interface {
 	RemoveMessageListener(listener MessageListener) bool
 	AddBroadcastListener(listener BroadcastListener) bool
 	RemoveBroadcastListener(listener BroadcastListener) bool
+	SendMessage(toConnectionStr string, payload packet.BasePacket)
 	CloseCommunication()
-}
-
-func containsBroadcastListener(bList []BroadcastListener, bItem BroadcastListener) int {
-	oldLen := len(bList)
-	listeners := make([]iListener, oldLen, oldLen)
-	for index, bListener := range bList {
-		listeners[index] = bListener
-	}
-	return contains(listeners, bItem)
-}
-
-func containsMessageListener(mList []MessageListener, mItem MessageListener) int {
-	oldLen := len(mList)
-	listeners := make([]iListener, oldLen, oldLen)
-	for index, mListener := range mList {
-		listeners[index] = mListener
-	}
-	return contains(listeners, mItem)
-}
-
-func contains(list []iListener, item iListener) int {
-	itemIndex := -1
-	for index, iItem := range list {
-		if iItem == item {
-			itemIndex = index
-			break
-		}
-	}
-	return itemIndex
 }
