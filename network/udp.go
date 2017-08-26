@@ -7,6 +7,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/imyousuf/lan-messenger/packet"
+	"github.com/imyousuf/lan-messenger/profile"
+)
+
+const (
+	sessionTimeout = 5 * time.Minute
+	pingInterval   = 2 * time.Minute
 )
 
 func checkError(err error) {
@@ -139,13 +147,13 @@ func (lc _ListenerConfig) GetMultiCastConnections() []*net.UDPConn {
 		if err == nil {
 			conn, err := net.DialUDP("udp", receiver, udpAddr)
 			if err != nil {
-				log.Println(err)
+				log.Println("2: ", err)
 				continue
 			}
 			connections = connections[:len(connections)+1]
 			connections[len(connections)-1] = conn
 		} else {
-			log.Println(err)
+			log.Println("3: ", err)
 		}
 	}
 	return connections
@@ -159,6 +167,7 @@ type _UDPCommunication struct {
 	messageListeners   []MessageListener
 	broadcastListeners []BroadcastListener
 	pingQuit           chan int
+	selfProfile        profile.UserProfile
 }
 
 func (comm *_UDPCommunication) handleRawMessages() {
@@ -286,31 +295,45 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	return err
 }
 
-func (comm _UDPCommunication) broadcastMessage(message string) {
+func (comm _UDPCommunication) broadcastMessage(listener _ListenerConfig, message packet.BasePacket) bool {
+	connections := listener.GetMultiCastConnections()
+	anyError := len(connections) == 0
+	for _, connection := range connections {
+		buf := convertPacketToEventData(message)
+		_, err := connection.Write(buf)
+		if err != nil {
+			anyError = true
+			log.Println("1: ", err)
+		}
+		connection.Close()
+	}
+	return anyError
+}
+
+func (comm _UDPCommunication) broadcastJoin() {
 	for _, listener := range comm.listeners {
-		for _, connection := range listener.GetMultiCastConnections() {
-			buf := []byte(message)
-			_, err := connection.Write(buf)
-			if err != nil {
-				log.Println(err)
-			}
-			connection.Close()
+		regPacket := packet.NewBuilderFactory().CreateNewSession().CreateSession(sessionTimeout).CreateUserProfile(comm.selfProfile.GetUsername(), comm.selfProfile.GetDisplayName(), comm.selfProfile.GetEmail()).RegisterDevice(listener.GetResolvedUnicastAddr().String(), 1).BuildRegisterPacket()
+		anyError := true
+		for anyError {
+			anyError = comm.broadcastMessage(listener, regPacket)
 		}
 	}
 }
 
-func (comm _UDPCommunication) broadcastJoin() {
-	comm.broadcastMessage("hello!")
+func (comm _UDPCommunication) broadcastPing() {
+	for _, listener := range comm.listeners {
+		pingPacket := packet.NewBuilderFactory().Ping().RenewSession(sessionTimeout).BuildPingPacket()
+		comm.broadcastMessage(listener, pingPacket)
+	}
 }
 
-func (comm *_UDPCommunication) setupPingBroadcast() {
-	ticker := time.NewTicker(30 * time.Second)
-	comm.pingQuit = make(chan int)
+func (comm _UDPCommunication) setupPingBroadcast() {
+	ticker := time.NewTicker(pingInterval)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				comm.broadcastJoin()
+				comm.broadcastPing()
 			case <-comm.pingQuit:
 				ticker.Stop()
 				comm.pingQuit <- 1
@@ -320,7 +343,7 @@ func (comm *_UDPCommunication) setupPingBroadcast() {
 	}()
 }
 
-func (comm *_UDPCommunication) broadcast(config Config) error {
+func (comm _UDPCommunication) broadcast() error {
 	log.Println("Sending initial broadcasts")
 	var err error
 	comm.broadcastJoin()
@@ -328,14 +351,16 @@ func (comm *_UDPCommunication) broadcast(config Config) error {
 	return err
 }
 
+func (comm *_UDPCommunication) InitCommunication(profile profile.UserProfile) error {
+	comm.selfProfile = profile
+	comm.pingQuit = make(chan int)
+	return comm.broadcast()
+}
+
 // SetupCommunication will multicast the existence of this client to the world in an orderly
 // fashion
 func (comm *_UDPCommunication) SetupCommunication(config Config) {
 	err := comm.listen(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = comm.broadcast(config)
 	if err != nil {
 		log.Fatal(err)
 	}

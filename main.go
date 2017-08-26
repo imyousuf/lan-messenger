@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/imyousuf/lan-messenger/network"
+	"github.com/imyousuf/lan-messenger/profile"
 )
 
 type _MessageListener struct {
@@ -61,6 +62,7 @@ func main() {
 	udpComm.AddMessageListener(&messageListener)
 	udpComm.AddBroadcastListener(&broadcastListener)
 	udpComm.SetupCommunication(config)
+	udpComm.InitCommunication(profile.NewUserProfile(getUserProfile()))
 	<-completeNotificationChannel
 	<-completeNotificationChannel
 }

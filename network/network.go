@@ -1,5 +1,7 @@
 package network
 
+import "github.com/imyousuf/lan-messenger/profile"
+
 // Config represents configuration for the application to inform which interfaces
 // to listen and broadcast to and also which port to bind to.
 type Config interface {
@@ -73,6 +75,7 @@ func (be _BroadcastEvent) GetBroadcastMessage() string {
 // nodes
 type Communication interface {
 	SetupCommunication(config Config)
+	InitCommunication(profile profile.UserProfile) error
 	AddMessageListener(listener MessageListener) bool
 	RemoveMessageListener(listener MessageListener) bool
 	AddBroadcastListener(listener BroadcastListener) bool
