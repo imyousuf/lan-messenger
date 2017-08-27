@@ -101,10 +101,12 @@ func (builder _Builder) RenewSession(age time.Duration) PingPacketBuilder {
 }
 func (builder _Builder) CreateUserProfile(username string,
 	displayName string, email string) DeviceProfileBuilder {
-	if utils.IsStringBlank(displayName) || utils.IsStringBlank(username) || utils.IsStringBlank(email) {
+	if utils.IsStringBlank(displayName) || utils.IsStringBlank(username) ||
+		utils.IsStringBlank(email) {
 		panic("None of the user profile attributes are optional")
 	}
-	if !utils.IsStringAlphaNumericWithSpace(username) || !utils.IsStringAlphaNumericWithSpace(displayName) {
+	if !utils.IsStringAlphaNumericWithSpace(username) ||
+		!utils.IsStringAlphaNumericWithSpace(displayName) {
 		panic("Username and Display Name must be Alpha Numeric only")
 	}
 	if !utils.IsStringValidEmailFormat(email) {

@@ -9,7 +9,8 @@ import (
 )
 
 func ExampleNewBuilderFactory() {
-	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.com").RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
+	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+		CreateUserProfile("a", "a", "a@a.com").RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
 	buffer := regPacket.GetPacketID() - 1
 	fmt.Println(regPacket.GetPacketID() - buffer)
 	signal := make(chan int)
@@ -51,30 +52,39 @@ func ExampleNewBuilderFactory_withPanic() {
 		}
 	}
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "a", "a")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("", "a", "a@a.com")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("", "a", "a@a.com")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "", "a@a.com")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "", "a@a.com")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "a", "")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a)", "a@a.co")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "a)", "a@a.co")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a_", "a", "a@a.co")
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a_", "a", "a@a.co")
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.co").RegisterDevice("", 1)
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "a", "a@a.co").RegisterDevice("", 1)
 	}, panicHandler)
 	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.co").RegisterDevice("aasd:123", 1)
+		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+			CreateUserProfile("a", "a", "a@a.co").RegisterDevice("aasd:123", 1)
 	}, panicHandler)
-	NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.co").RegisterDevice("127.0.0.1:123", 1).BuildRegisterPacket()
+	NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+		CreateUserProfile("a", "a", "a@a.co").RegisterDevice("127.0.0.1:123", 1).BuildRegisterPacket()
 	// Output:
 	// As expected panic handled: Email is not well formatted!
 	// As expected panic handled: None of the user profile attributes are optional
@@ -90,7 +100,9 @@ func TestRegisterPacketCreation(t *testing.T) {
 	age, username, displayName, email, connectionStr := 5*time.Minute, "a", "a", "a@a.com", "127.0.0.1:3000"
 	var deviceIndex uint8
 	deviceIndex = 2
-	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).BuildRegisterPacket()
+	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).
+		CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).
+		BuildRegisterPacket()
 	if regPacket == nil {
 		t.Error("Registration packet is nil!")
 	}
@@ -159,7 +171,9 @@ func TestFromJSON(t *testing.T) {
 	var basePack BasePacket
 	basePack, _ = FromJSON([]byte(deregPacket.ToJSON()), SignOffPacketType)
 	checkSignOffPacket(t, basePack.(SignOffPacket))
-	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).BuildRegisterPacket()
+	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).
+		CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).
+		BuildRegisterPacket()
 	basePack, _ = FromJSON([]byte(regPacket.ToJSON()), RegisterPacketType)
 	checkPingPacket(t, basePack.(RegisterPacket), age)
 	pingPacket := NewBuilderFactory().Ping().RenewSession(age).BuildPingPacket()

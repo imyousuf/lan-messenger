@@ -122,19 +122,22 @@ func createEventFromEventData(eventData []byte) Event {
 		packetData := eventData[len([]byte(RegisterEventName+newline)):]
 		parsedPacket, _ := packet.FromJSON(packetData, packet.RegisterPacketType)
 		regEvent := _RegisterEvent{}
-		regEvent.Name, regEvent.RawData, regEvent.packet = RegisterEventName, eventData, parsedPacket.(packet.RegisterPacket)
+		regEvent.Name, regEvent.RawData, regEvent.packet = RegisterEventName, eventData,
+			parsedPacket.(packet.RegisterPacket)
 		return regEvent
 	case PingEventName:
 		packetData := eventData[len([]byte(PingEventName+newline)):]
 		parsedPacket, _ := packet.FromJSON(packetData, packet.PingPacketType)
 		pingEvent := _PingEvent{}
-		pingEvent.Name, pingEvent.RawData, pingEvent.packet = PingEventName, eventData, parsedPacket.(packet.PingPacket)
+		pingEvent.Name, pingEvent.RawData, pingEvent.packet = PingEventName, eventData,
+			parsedPacket.(packet.PingPacket)
 		return pingEvent
 	case SignOffEventName:
 		packetData := eventData[len([]byte(SignOffEventName+newline)):]
 		parsedPacket, _ := packet.FromJSON(packetData, packet.SignOffPacketType)
 		signOffEvent := _SignOffEvent{}
-		signOffEvent.Name, signOffEvent.RawData, signOffEvent.packet = SignOffEventName, eventData, parsedPacket
+		signOffEvent.Name, signOffEvent.RawData, signOffEvent.packet = SignOffEventName, eventData,
+			parsedPacket
 		return signOffEvent
 	default:
 		return _Event{Name: UnknownEventName, RawData: eventData}

@@ -194,7 +194,8 @@ func (comm *_UDPCommunication) listen(config Config) error {
 	return err
 }
 
-func (comm _UDPCommunication) broadcastMessage(listener _ListenerConfig, message packet.BasePacket) bool {
+func (comm _UDPCommunication) broadcastMessage(listener _ListenerConfig,
+	message packet.BasePacket) bool {
 	connections := listener.GetMultiCastConnections()
 	anyError := len(connections) == 0
 	for _, connection := range connections {
@@ -210,7 +211,10 @@ func (comm _UDPCommunication) broadcastMessage(listener _ListenerConfig, message
 }
 
 func (comm _UDPCommunication) getSelfRegisterPacket(listener _ListenerConfig) packet.RegisterPacket {
-	return packet.NewBuilderFactory().CreateNewSession().CreateSession(sessionTimeout).CreateUserProfile(comm.selfProfile.GetUsername(), comm.selfProfile.GetDisplayName(), comm.selfProfile.GetEmail()).RegisterDevice(listener.GetResolvedUnicastAddr().String(), 1).BuildRegisterPacket()
+	return packet.NewBuilderFactory().CreateNewSession().CreateSession(sessionTimeout).
+		CreateUserProfile(comm.selfProfile.GetUsername(), comm.selfProfile.GetDisplayName(),
+			comm.selfProfile.GetEmail()).
+		RegisterDevice(listener.GetResolvedUnicastAddr().String(), 1).BuildRegisterPacket()
 }
 
 func (comm _UDPCommunication) broadcastJoin() {
@@ -297,7 +301,8 @@ func (comm _UDPCommunication) SendMessage(toConnectionStr string, payload packet
 	})
 }
 
-func (comm _UDPCommunication) sendMessage(lc _ListenerConfig, toConnectionStr string, payload packet.BasePacket) bool {
+func (comm _UDPCommunication) sendMessage(lc _ListenerConfig,
+	toConnectionStr string, payload packet.BasePacket) bool {
 	receiver := lc.getResolvedBroadcastReceiverAddr()
 	anyError := false
 	udpAddr, err := net.ResolveUDPAddr("udp", toConnectionStr)
