@@ -18,15 +18,14 @@ const (
 
 // UDPCommunication is a concrete implementation of Communication interface
 type _UDPCommunication struct {
-	listeners            map[string]_ListenerConfig
-	messageChannel       chan []byte
-	broadcastChannel     chan []byte
-	messageListeners     []MessageListener
-	broadcastListeners   []BroadcastListener
-	pingQuit             chan int
-	selfProfile          profile.UserProfile
-	sessionRegistry      map[string]_RegistryEntry
-	sessionRegistryMutex *sync.Mutex
+	listeners          map[string]_ListenerConfig
+	messageChannel     chan []byte
+	broadcastChannel   chan []byte
+	messageListeners   []MessageListener
+	broadcastListeners []BroadcastListener
+	pingQuit           chan int
+	selfProfile        profile.UserProfile
+	sessionRegistry    sync.Map
 }
 
 func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
@@ -34,9 +33,8 @@ func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
 	if utils.IsStringBlank(sessionID) {
 		return false
 	}
-	comm.sessionRegistryMutex.Lock()
-	defer comm.sessionRegistryMutex.Unlock()
-	if registryEntry, ok := comm.sessionRegistry[sessionID]; ok {
+	if value, ok := comm.sessionRegistry.Load(sessionID); ok {
+		registryEntry := value.(_RegistryEntry)
 		if _, packetExists := registryEntry.packetRegistry[packetID]; packetExists {
 			registryEntry.packetRegistry[packetID]++
 			return false
@@ -44,7 +42,7 @@ func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
 		registryEntry.packetRegistry[packetID] = 1
 		return true
 	} else if registerEvent, eventOk := event.(RegisterEvent); eventOk {
-		comm.sessionRegistry[sessionID] = newRegistryEntry(registerEvent)
+		comm.sessionRegistry.Store(sessionID, newRegistryEntry(registerEvent))
 		return true
 	} else {
 		return false
@@ -53,22 +51,22 @@ func (comm *_UDPCommunication) isNotDuplicate(event Event) bool {
 
 func (comm *_UDPCommunication) renewRegistryEntry(event PingEvent) {
 	sessionID, _ := event.GetEventIdentifier()
-	comm.sessionRegistryMutex.Lock()
-	defer comm.sessionRegistryMutex.Unlock()
-	if registryEntry, ok := comm.sessionRegistry[sessionID]; ok {
+	if value, ok := comm.sessionRegistry.Load(sessionID); ok {
+		registryEntry := value.(_RegistryEntry)
 		registryEntry.expiryTime = event.GetPingPacket().GetExpiryTime()
 	}
 }
 
 func (comm *_UDPCommunication) cleanExpiredRegistryEntries() {
-	comm.sessionRegistryMutex.Lock()
-	defer comm.sessionRegistryMutex.Unlock()
-	for sessionID, registryEvent := range comm.sessionRegistry {
+	comm.sessionRegistry.Range(func(key interface{}, value interface{}) bool {
+		sessionID := key.(string)
+		registryEvent := value.(_RegistryEntry)
 		now := time.Now()
 		if registryEvent.expiryTime.Before(now) {
-			delete(comm.sessionRegistry, sessionID)
+			comm.sessionRegistry.Delete(sessionID)
 		}
-	}
+		return true
+	})
 }
 
 func (comm *_UDPCommunication) handleRawMessages() {
@@ -268,7 +266,7 @@ func (comm *_UDPCommunication) InitCommunication(profile profile.UserProfile) er
 // SetupCommunication will multicast the existence of this client to the world in an orderly
 // fashion
 func (comm *_UDPCommunication) SetupCommunication(config Config) {
-	comm.sessionRegistry = make(map[string]_RegistryEntry)
+	comm.sessionRegistry = sync.Map{}
 	err := comm.listen(config)
 	if err != nil {
 		log.Fatal(err)
@@ -350,7 +348,6 @@ func (comm *_UDPCommunication) addInternalListeners() {
 // NewUDPCommunication returns UDP implementation of communication for the application
 func NewUDPCommunication() Communication {
 	comm := &_UDPCommunication{}
-	comm.sessionRegistryMutex = &sync.Mutex{}
 	comm.addInternalListeners()
 	return comm
 }
