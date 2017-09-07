@@ -1,4 +1,4 @@
-# **lamess** - lan-messenger ![Build status](https://travis-ci.org/imyousuf/lan-messenger.svg?branch=master)
+# **lamess** - lan-messenger [![Build Status](https://travis-ci.org/lamessenger/lan-messenger.svg?branch=master)](https://travis-ci.org/lamessenger/lan-messenger)
 A console based messenger for LANs.
 
 # Getting Started
