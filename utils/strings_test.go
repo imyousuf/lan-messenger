@@ -56,7 +56,7 @@ func TestIsStringValidEmailFormat(t *testing.T) {
 }
 
 func TestIsValidIPv4Address(t *testing.T) {
-	successCases := []string{"255.255.255.255", "0.0.0.0", "00.00.00.00", "127.0.0.1", "192.168.1.101"}
+	successCases := []string{"255.255.255.255", "0.0.0.0", "00.00.00.00", "127.0.0.1", "192.168.1.101", "192.168.1.207"}
 	for _, successCase := range successCases {
 		if !IsValidIPv4Address(successCase) {
 			t.Error("Should pass as IP Address: ", successCase)
