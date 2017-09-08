@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/imyousuf/lan-messenger/packet"
+	"github.com/imyousuf/lan-messenger/profile"
 )
 
 func Example_convertPacketToEventData() {
-	regPacket := packet.NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.co").RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
+	regPacket := packet.NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+		CreateUserProfile(profile.NewUserProfile("a", "a", "a@a.co")).RegisterDevice("127.0.0.1:3000", 2).
+		BuildRegisterPacket()
 	writeBuf := convertPacketToEventData(regPacket)
 	fmt.Println(strings.Split(string(writeBuf), "\n")[0])
 	writeBuf = convertPacketToEventData(packet.NewBuilderFactory().Ping().RenewSession(5 * time.Minute).BuildPingPacket())
@@ -22,7 +25,9 @@ func Example_convertPacketToEventData() {
 	// SIGNOFF
 }
 func Example_createEventFromEventData() {
-	regPacket := packet.NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).CreateUserProfile("a", "a", "a@a.co").RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
+	regPacket := packet.NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
+		CreateUserProfile(profile.NewUserProfile("a", "a", "a@a.co")).RegisterDevice("127.0.0.1:3000", 2).
+		BuildRegisterPacket()
 	parsedRegEvent := createEventFromEventData(convertPacketToEventData(regPacket)).(RegisterEvent)
 	fmt.Println(parsedRegEvent.GetName())
 	fmt.Println(regPacket.GetPacketID() == parsedRegEvent.GetRegisterPacket().GetPacketID())

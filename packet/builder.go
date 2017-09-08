@@ -1,13 +1,12 @@
 package packet
 
 import (
-	"encoding/json"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
 
@@ -18,7 +17,7 @@ type DeviceProfileBuilder interface {
 
 // UserProfileBuilder builds towards RegisterPacket
 type UserProfileBuilder interface {
-	CreateUserProfile(username string, displayName string, email string) DeviceProfileBuilder
+	CreateUserProfile(userProfile profile.UserProfile) DeviceProfileBuilder
 }
 
 // SessionBuilder builds towards RegisterPacket
@@ -56,31 +55,16 @@ type BuilderFactory interface {
 type _Builder struct {
 	// Persistent singleton fields
 	sessionID        uuid.UUID
-	deviceID         uuid.UUID
 	packetSequenceID uint64
 	// transient fields
 	expiryTime            time.Time
 	devicePreferenceIndex uint8
 	replyTo               string
-	username              string
-	displayName           string
-	email                 string
+	userProfile           profile.UserProfile
 }
 
 func (builder *_Builder) CreateNewSession() SessionBuilder {
 	atomic.AddUint64(&builder.packetSequenceID, 1)
-	sessionID, err := uuid.NewRandom()
-	if err == nil {
-		builder.sessionID = sessionID
-	} else {
-		panic("Could not generate Session ID")
-	}
-	deviceID, err := uuid.NewRandom()
-	if err == nil {
-		builder.deviceID = deviceID
-	} else {
-		panic("Could not generate Device ID")
-	}
 	return builder
 }
 func (builder *_Builder) SignOff() SignOffPacketBuilder {
@@ -99,22 +83,8 @@ func (builder _Builder) RenewSession(age time.Duration) PingPacketBuilder {
 	builder.expiryTime = time.Now().Add(age)
 	return builder
 }
-func (builder _Builder) CreateUserProfile(username string,
-	displayName string, email string) DeviceProfileBuilder {
-	if utils.IsStringBlank(displayName) || utils.IsStringBlank(username) ||
-		utils.IsStringBlank(email) {
-		panic("None of the user profile attributes are optional")
-	}
-	if !utils.IsStringAlphaNumericWithSpace(username) ||
-		!utils.IsStringAlphaNumericWithSpace(displayName) {
-		panic("Username and Display Name must be Alpha Numeric only")
-	}
-	if !utils.IsStringValidEmailFormat(email) {
-		panic("Email is not well formatted!")
-	}
-	builder.displayName = displayName
-	builder.username = username
-	builder.email = email
+func (builder _Builder) CreateUserProfile(userProfile profile.UserProfile) DeviceProfileBuilder {
+	builder.userProfile = userProfile
 	return builder
 }
 func (builder _Builder) RegisterDevice(
@@ -148,130 +118,36 @@ func (builder _Builder) BuildRegisterPacket() RegisterPacket {
 	packet.PacketID = builder.packetSequenceID
 	packet.SessionID = builder.sessionID.String()
 	packet.ExpiryTime = builder.expiryTime
-	packet.DeviceID = builder.deviceID.String()
 	packet.ReplyTo = builder.replyTo
 	packet.DevicePreferenceIndex = builder.devicePreferenceIndex
-	packet.Username = builder.username
-	packet.Email = builder.email
-	packet.DisplayName = builder.displayName
+	packet.Username, packet.DisplayName, packet.Email = builder.userProfile.GetUsername(), builder.userProfile.GetDisplayName(), builder.userProfile.GetEmail()
 	return packet
 }
 
-var builderFactory BuilderFactory
+var builder *_Builder
 var once sync.Once
+
+func initBuilder() {
+	once.Do(func() {
+		builder = &_Builder{}
+		sessionID, err := uuid.NewRandom()
+		if err == nil {
+			builder.sessionID = sessionID
+		} else {
+			panic("Could not generate Session ID")
+		}
+
+	})
+}
 
 // NewBuilderFactory retrieves singleton builder factory
 func NewBuilderFactory() BuilderFactory {
-	once.Do(func() {
-		builderFactory = &_Builder{}
-	})
-	return builderFactory
+	initBuilder()
+	return builder
 }
 
-func toJSON(packet interface{}) string {
-	jsonBytes, err := json.Marshal(packet)
-	if err == nil {
-		return string(jsonBytes)
-	}
-	log.Fatal(err)
-	return ""
-}
-
-type _BasePacket struct {
-	PacketID  uint64
-	SessionID string
-}
-
-func (packet _BasePacket) GetPacketID() uint64 {
-	return packet.PacketID
-}
-func (packet _BasePacket) GetSessionID() string {
-	return packet.SessionID
-}
-func (packet _BasePacket) ToJSON() string {
-	return toJSON(packet)
-}
-
-type _PingPacket struct {
-	_BasePacket
-	ExpiryTime time.Time
-}
-
-func (packet _PingPacket) GetExpiryTime() time.Time {
-	return packet.ExpiryTime
-}
-
-func (packet _PingPacket) ToJSON() string {
-	return toJSON(packet)
-}
-
-type _RegisterPacket struct {
-	_PingPacket
-	DeviceID              string
-	DevicePreferenceIndex uint8
-	ReplyTo               string
-	Username              string
-	DisplayName           string
-	Email                 string
-}
-
-func (packet _RegisterPacket) GetDeviceID() string {
-	return packet.DeviceID
-}
-func (packet _RegisterPacket) GetReplyTo() string {
-	return packet.ReplyTo
-}
-func (packet _RegisterPacket) GetUsername() string {
-	return packet.Username
-}
-func (packet _RegisterPacket) GetDisplayName() string {
-	return packet.DisplayName
-}
-func (packet _RegisterPacket) GetEmail() string {
-	return packet.Email
-}
-func (packet _RegisterPacket) GetDevicePreferenceIndex() uint8 {
-	return packet.DevicePreferenceIndex
-}
-
-func (packet _RegisterPacket) ToJSON() string {
-	return toJSON(packet)
-}
-
-const (
-	// RegisterPacketType should be used when wanting to parse a buffer as RegisterPacket
-	RegisterPacketType = iota
-	// PingPacketType should be used when wanting to parse a buffer as PingPacket
-	PingPacketType
-	// SignOffPacketType should be used when wanting to parse a buffer as SignOffPacket
-	SignOffPacketType
-)
-
-// FromJSON converts a byte array to a packet type as requested the API invoker
-func FromJSON(jsonBuf []byte, packetType int) (BasePacket, error) {
-	switch packetType {
-	case RegisterPacketType:
-		packet := _RegisterPacket{}
-		err := json.Unmarshal(jsonBuf, &packet)
-		if err != nil {
-			return nil, err
-		}
-		return packet, err
-	case PingPacketType:
-		packet := _PingPacket{}
-		err := json.Unmarshal(jsonBuf, &packet)
-		if err != nil {
-			return nil, err
-		}
-		return packet, err
-	case SignOffPacketType:
-		packet := _BasePacket{}
-		err := json.Unmarshal(jsonBuf, &packet)
-		if err != nil {
-			return nil, err
-		}
-		return packet, err
-	default:
-		panic("Unknown packet type!")
-	}
+// GetCurrentSessionID returns the Session ID currently in progress by this process
+func GetCurrentSessionID() string {
+	initBuilder()
+	return builder.sessionID.String()
 }

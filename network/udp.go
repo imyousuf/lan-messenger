@@ -210,8 +210,7 @@ func (comm _UDPCommunication) broadcastMessage(listener _ListenerConfig,
 
 func (comm _UDPCommunication) getSelfRegisterPacket(listener _ListenerConfig) packet.RegisterPacket {
 	return packet.NewBuilderFactory().CreateNewSession().CreateSession(sessionTimeout).
-		CreateUserProfile(comm.selfProfile.GetUsername(), comm.selfProfile.GetDisplayName(),
-			comm.selfProfile.GetEmail()).
+		CreateUserProfile(comm.selfProfile).
 		RegisterDevice(listener.GetResolvedUnicastAddr().String(), 1).BuildRegisterPacket()
 }
 
