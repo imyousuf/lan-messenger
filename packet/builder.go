@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
 
@@ -18,7 +19,7 @@ type DeviceProfileBuilder interface {
 
 // UserProfileBuilder builds towards RegisterPacket
 type UserProfileBuilder interface {
-	CreateUserProfile(username string, displayName string, email string) DeviceProfileBuilder
+	CreateUserProfile(userProfile profile.UserProfile) DeviceProfileBuilder
 }
 
 // SessionBuilder builds towards RegisterPacket
@@ -61,9 +62,7 @@ type _Builder struct {
 	expiryTime            time.Time
 	devicePreferenceIndex uint8
 	replyTo               string
-	username              string
-	displayName           string
-	email                 string
+	userProfile           profile.UserProfile
 }
 
 func (builder *_Builder) CreateNewSession() SessionBuilder {
@@ -86,22 +85,8 @@ func (builder _Builder) RenewSession(age time.Duration) PingPacketBuilder {
 	builder.expiryTime = time.Now().Add(age)
 	return builder
 }
-func (builder _Builder) CreateUserProfile(username string,
-	displayName string, email string) DeviceProfileBuilder {
-	if utils.IsStringBlank(displayName) || utils.IsStringBlank(username) ||
-		utils.IsStringBlank(email) {
-		panic("None of the user profile attributes are optional")
-	}
-	if !utils.IsStringAlphaNumericWithSpace(username) ||
-		!utils.IsStringAlphaNumericWithSpace(displayName) {
-		panic("Username and Display Name must be Alpha Numeric only")
-	}
-	if !utils.IsStringValidEmailFormat(email) {
-		panic("Email is not well formatted!")
-	}
-	builder.displayName = displayName
-	builder.username = username
-	builder.email = email
+func (builder _Builder) CreateUserProfile(userProfile profile.UserProfile) DeviceProfileBuilder {
+	builder.userProfile = userProfile
 	return builder
 }
 func (builder _Builder) RegisterDevice(
@@ -137,9 +122,7 @@ func (builder _Builder) BuildRegisterPacket() RegisterPacket {
 	packet.ExpiryTime = builder.expiryTime
 	packet.ReplyTo = builder.replyTo
 	packet.DevicePreferenceIndex = builder.devicePreferenceIndex
-	packet.Username = builder.username
-	packet.Email = builder.email
-	packet.DisplayName = builder.displayName
+	packet.Username, packet.DisplayName, packet.Email = builder.userProfile.GetUsername(), builder.userProfile.GetDisplayName(), builder.userProfile.GetEmail()
 	return packet
 }
 
@@ -211,14 +194,8 @@ type _RegisterPacket struct {
 func (packet _RegisterPacket) GetReplyTo() string {
 	return packet.ReplyTo
 }
-func (packet _RegisterPacket) GetUsername() string {
-	return packet.Username
-}
-func (packet _RegisterPacket) GetDisplayName() string {
-	return packet.DisplayName
-}
-func (packet _RegisterPacket) GetEmail() string {
-	return packet.Email
+func (packet _RegisterPacket) GetUserProfile() profile.UserProfile {
+	return profile.NewUserProfile(packet.Username, packet.DisplayName, packet.Email)
 }
 func (packet _RegisterPacket) GetDevicePreferenceIndex() uint8 {
 	return packet.DevicePreferenceIndex
@@ -244,6 +221,7 @@ func FromJSON(jsonBuf []byte, packetType int) (BasePacket, error) {
 		packet := _RegisterPacket{}
 		err := json.Unmarshal(jsonBuf, &packet)
 		if err != nil {
+			log.Println(err)
 			return nil, err
 		}
 		return packet, err
@@ -251,6 +229,7 @@ func FromJSON(jsonBuf []byte, packetType int) (BasePacket, error) {
 		packet := _PingPacket{}
 		err := json.Unmarshal(jsonBuf, &packet)
 		if err != nil {
+			log.Println(err)
 			return nil, err
 		}
 		return packet, err
@@ -258,6 +237,7 @@ func FromJSON(jsonBuf []byte, packetType int) (BasePacket, error) {
 		packet := _BasePacket{}
 		err := json.Unmarshal(jsonBuf, &packet)
 		if err != nil {
+			log.Println(err)
 			return nil, err
 		}
 		return packet, err

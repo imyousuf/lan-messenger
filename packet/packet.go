@@ -1,6 +1,10 @@
 package packet
 
-import "time"
+import (
+	"time"
+
+	"github.com/imyousuf/lan-messenger/profile"
+)
 
 // BasePacket represents the packet information required for all messages
 type BasePacket interface {
@@ -20,9 +24,7 @@ type PingPacket interface {
 type RegisterPacket interface {
 	PingPacket
 	GetReplyTo() string
-	GetUsername() string
-	GetDisplayName() string
-	GetEmail() string
+	GetUserProfile() profile.UserProfile
 	GetDevicePreferenceIndex() uint8
 }
 

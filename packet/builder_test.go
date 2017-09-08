@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
 
 func ExampleNewBuilderFactory() {
 	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-		CreateUserProfile("a", "a", "a@a.com").RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
+		CreateUserProfile(profile.NewUserProfile("a", "a", "a@a.com")).
+		RegisterDevice("127.0.0.1:3000", 2).BuildRegisterPacket()
 	buffer := regPacket.GetPacketID() - 1
 	fmt.Println(regPacket.GetPacketID() - buffer)
 	signal := make(chan int)
@@ -46,52 +48,21 @@ func unknownPacketBuild(packetBuilder func(), panicHandler func()) {
 }
 
 func ExampleNewBuilderFactory_withPanic() {
-	panicHandler := func() {
-		if r := recover(); r != nil {
-			fmt.Println("As expected panic handled:", r)
-		}
+	panicHandler := func(r interface{}) {
+		fmt.Println("As expected panic handled:", r)
 	}
-	unknownPacketBuild(func() {
+	uProfile := profile.NewUserProfile("a", "a", "a@a.co")
+	utils.PanicableInvocation(func() {
 		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "a", "a")
+			CreateUserProfile(uProfile).RegisterDevice("", 1)
 	}, panicHandler)
-	unknownPacketBuild(func() {
+	utils.PanicableInvocation(func() {
 		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("", "a", "a@a.com")
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "", "a@a.com")
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "a", "")
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "a)", "a@a.co")
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a_", "a", "a@a.co")
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "a", "a@a.co").RegisterDevice("", 1)
-	}, panicHandler)
-	unknownPacketBuild(func() {
-		NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile("a", "a", "a@a.co").RegisterDevice("aasd:123", 1)
+			CreateUserProfile(uProfile).RegisterDevice("aasd:123", 1)
 	}, panicHandler)
 	NewBuilderFactory().CreateNewSession().CreateSession(5*time.Minute).
-		CreateUserProfile("a", "a", "a@a.co").RegisterDevice("127.0.0.1:123", 1).BuildRegisterPacket()
+		CreateUserProfile(uProfile).RegisterDevice("127.0.0.1:123", 1).BuildRegisterPacket()
 	// Output:
-	// As expected panic handled: Email is not well formatted!
-	// As expected panic handled: None of the user profile attributes are optional
-	// As expected panic handled: None of the user profile attributes are optional
-	// As expected panic handled: None of the user profile attributes are optional
-	// As expected panic handled: Username and Display Name must be Alpha Numeric only
-	// As expected panic handled: Username and Display Name must be Alpha Numeric only
 	// As expected panic handled: No reply-to value provided
 	// As expected panic handled: reply-to not provided in `ip-address:port` format!
 }
@@ -101,7 +72,7 @@ func TestRegisterPacketCreation(t *testing.T) {
 	var deviceIndex uint8
 	deviceIndex = 2
 	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).
-		CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).
+		CreateUserProfile(profile.NewUserProfile(username, displayName, email)).RegisterDevice(connectionStr, deviceIndex).
 		BuildRegisterPacket()
 	if regPacket == nil {
 		t.Error("Registration packet is nil!")
@@ -116,7 +87,9 @@ func TestRegisterPacketCreation(t *testing.T) {
 	if expiryTime.Before(time.Now()) || expiryTime.After(time.Now().Add(age)) {
 		t.Error("Invalid expiry time")
 	}
-	if username != regPacket.GetUsername() || displayName != regPacket.GetDisplayName() || email != regPacket.GetEmail() {
+	if username != regPacket.GetUserProfile().GetUsername() ||
+		displayName != regPacket.GetUserProfile().GetDisplayName() ||
+		email != regPacket.GetUserProfile().GetEmail() {
 		t.Error("User profile did not match")
 	}
 	if connectionStr != regPacket.GetReplyTo() || deviceIndex != regPacket.GetDevicePreferenceIndex() {
@@ -172,7 +145,8 @@ func TestFromJSON(t *testing.T) {
 	basePack, _ = FromJSON([]byte(deregPacket.ToJSON()), SignOffPacketType)
 	checkSignOffPacket(t, basePack.(SignOffPacket))
 	regPacket := NewBuilderFactory().CreateNewSession().CreateSession(age).
-		CreateUserProfile(username, displayName, email).RegisterDevice(connectionStr, deviceIndex).
+		CreateUserProfile(profile.NewUserProfile(username, displayName, email)).
+		RegisterDevice(connectionStr, deviceIndex).
 		BuildRegisterPacket()
 	basePack, _ = FromJSON([]byte(regPacket.ToJSON()), RegisterPacketType)
 	checkPingPacket(t, basePack.(RegisterPacket), age)
