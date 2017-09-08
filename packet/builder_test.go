@@ -109,7 +109,7 @@ func TestRegisterPacketCreation(t *testing.T) {
 	if regPacket.GetPacketID() <= 0 {
 		t.Error("Not a valid packet ID")
 	}
-	if utils.IsStringBlank(regPacket.GetDeviceID()) || utils.IsStringBlank(regPacket.GetSessionID()) {
+	if utils.IsStringBlank(regPacket.GetSessionID()) {
 		t.Error("Blank String not expected for Device ID or Session ID")
 	}
 	expiryTime := regPacket.GetExpiryTime()

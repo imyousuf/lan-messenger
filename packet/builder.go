@@ -56,7 +56,6 @@ type BuilderFactory interface {
 type _Builder struct {
 	// Persistent singleton fields
 	sessionID        uuid.UUID
-	deviceID         uuid.UUID
 	packetSequenceID uint64
 	// transient fields
 	expiryTime            time.Time
@@ -136,7 +135,6 @@ func (builder _Builder) BuildRegisterPacket() RegisterPacket {
 	packet.PacketID = builder.packetSequenceID
 	packet.SessionID = builder.sessionID.String()
 	packet.ExpiryTime = builder.expiryTime
-	packet.DeviceID = builder.deviceID.String()
 	packet.ReplyTo = builder.replyTo
 	packet.DevicePreferenceIndex = builder.devicePreferenceIndex
 	packet.Username = builder.username
@@ -153,12 +151,6 @@ func NewBuilderFactory() BuilderFactory {
 	once.Do(func() {
 		builder := &_Builder{}
 		builderFactory = builder
-		deviceID, err := uuid.NewRandom()
-		if err == nil {
-			builder.deviceID = deviceID
-		} else {
-			panic("Could not generate Device ID")
-		}
 		sessionID, err := uuid.NewRandom()
 		if err == nil {
 			builder.sessionID = sessionID
@@ -209,7 +201,6 @@ func (packet _PingPacket) ToJSON() string {
 
 type _RegisterPacket struct {
 	_PingPacket
-	DeviceID              string
 	DevicePreferenceIndex uint8
 	ReplyTo               string
 	Username              string
@@ -217,9 +208,6 @@ type _RegisterPacket struct {
 	Email                 string
 }
 
-func (packet _RegisterPacket) GetDeviceID() string {
-	return packet.DeviceID
-}
 func (packet _RegisterPacket) GetReplyTo() string {
 	return packet.ReplyTo
 }

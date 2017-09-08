@@ -19,7 +19,6 @@ type PingPacket interface {
 // and when it pings its peers notifying its presence
 type RegisterPacket interface {
 	PingPacket
-	GetDeviceID() string
 	GetReplyTo() string
 	GetUsername() string
 	GetDisplayName() string
