@@ -69,18 +69,6 @@ type _Builder struct {
 
 func (builder *_Builder) CreateNewSession() SessionBuilder {
 	atomic.AddUint64(&builder.packetSequenceID, 1)
-	sessionID, err := uuid.NewRandom()
-	if err == nil {
-		builder.sessionID = sessionID
-	} else {
-		panic("Could not generate Session ID")
-	}
-	deviceID, err := uuid.NewRandom()
-	if err == nil {
-		builder.deviceID = deviceID
-	} else {
-		panic("Could not generate Device ID")
-	}
 	return builder
 }
 func (builder *_Builder) SignOff() SignOffPacketBuilder {
@@ -163,7 +151,21 @@ var once sync.Once
 // NewBuilderFactory retrieves singleton builder factory
 func NewBuilderFactory() BuilderFactory {
 	once.Do(func() {
-		builderFactory = &_Builder{}
+		builder := &_Builder{}
+		builderFactory = builder
+		deviceID, err := uuid.NewRandom()
+		if err == nil {
+			builder.deviceID = deviceID
+		} else {
+			panic("Could not generate Device ID")
+		}
+		sessionID, err := uuid.NewRandom()
+		if err == nil {
+			builder.sessionID = sessionID
+		} else {
+			panic("Could not generate Session ID")
+		}
+
 	})
 	return builderFactory
 }
