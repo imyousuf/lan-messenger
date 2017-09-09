@@ -6,8 +6,12 @@ import (
 	"github.com/go-ini/ini"
 )
 
-func getSection(sectionName string) *ini.Section {
-	cfg, err := ini.InsensitiveLoad("lamess.cfg")
+var loadConfiguration = func() (*ini.File, error) {
+	return ini.InsensitiveLoad("lamess.cfg")
+}
+
+func getSection(sectionName string, loadFunc func() (*ini.File, error)) *ini.Section {
+	cfg, err := loadFunc()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,7 +26,7 @@ func getSection(sectionName string) *ini.Section {
 // single port in, the configuration represents a sequential 3 port config - listening for incoming
 // msg, listen for broadcasting message and listening for transmitted message response respectively.
 func GetNetworkConfig() (int, string) {
-	section := getSection("network")
+	section := getSection("network", loadConfiguration)
 	sPort, pErr := section.GetKey("port")
 	port := 0
 	if pErr == nil {
@@ -45,7 +49,7 @@ func GetNetworkConfig() (int, string) {
 // GetDeviceConfig returns the index of important for the current device for the specified user
 // profile
 func GetDeviceConfig() uint8 {
-	section := getSection("device")
+	section := getSection("device", loadConfiguration)
 	sIndex, pErr := section.GetKey("deviceindex")
 	var index uint
 	if pErr == nil {
@@ -60,7 +64,7 @@ func GetDeviceConfig() uint8 {
 // GetUserProfile returns the username, displayname, email of the current app instance it basically
 // represents the profile.UserProfile
 func GetUserProfile() (string, string, string) {
-	section := getSection("profile")
+	section := getSection("profile", loadConfiguration)
 	keys := []string{"username", "displayname", "email"}
 	result := make(map[string]string, len(keys))
 	for _, key := range keys {
