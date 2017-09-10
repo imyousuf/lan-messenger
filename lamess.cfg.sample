@@ -9,3 +9,7 @@ displayname=Some One
 
 [device]
 deviceindex=1
+
+; Storage is a optional configuration
+[storage]
+location=/tmp/lamess/

@@ -2,8 +2,12 @@ package application
 
 import (
 	"log"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/go-ini/ini"
+	"github.com/imyousuf/lan-messenger/utils"
 )
 
 var loadConfiguration = func() (*ini.File, error) {
@@ -13,12 +17,20 @@ var loadConfiguration = func() (*ini.File, error) {
 func getSection(sectionName string, loadFunc func() (*ini.File, error)) *ini.Section {
 	cfg, err := loadFunc()
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	section, sErr := cfg.GetSection(sectionName)
 	if sErr != nil {
-		log.Fatal(sErr)
+		log.Panic(sErr)
 	}
+	return section
+}
+
+func getOptionalSection(sectionName string, loadFunc func() (*ini.File, error)) *ini.Section {
+	var section *ini.Section
+	utils.PanicableInvocation(func() {
+		section = getSection(sectionName, loadFunc)
+	}, func(err interface{}) {})
 	return section
 }
 
@@ -49,11 +61,13 @@ func GetNetworkConfig() (int, string) {
 // GetDeviceConfig returns the index of important for the current device for the specified user
 // profile
 func GetDeviceConfig() uint8 {
-	section := getSection("device", loadConfiguration)
-	sIndex, pErr := section.GetKey("deviceindex")
+	section := getOptionalSection("device", loadConfiguration)
 	var index uint
-	if pErr == nil {
-		index, _ = sIndex.Uint()
+	if section != nil {
+		sIndex, pErr := section.GetKey("deviceindex")
+		if pErr == nil {
+			index, _ = sIndex.Uint()
+		}
 	}
 	if index <= 0 {
 		index = 1
@@ -72,8 +86,30 @@ func GetUserProfile() (string, string, string) {
 		if err == nil {
 			result[key] = sString.String()
 		} else {
-			result[key] = ""
+			panic("Missing user profile config key " + key)
 		}
 	}
 	return result[keys[0]], result[keys[1]], result[keys[2]]
+}
+
+var locationInitializer sync.Once
+
+// GetStorageLocation returns the location where application may store data
+func GetStorageLocation() string {
+	section := getOptionalSection("storage", loadConfiguration)
+	if section != nil {
+		if location, err := section.GetKey("location"); err == nil {
+			return location.String()
+		}
+	}
+	defaultLocation := filepath.Join(os.TempDir(), "lamess")
+	locationInitializer.Do(func() {
+		if _, err := os.Stat(defaultLocation); os.IsNotExist(err) {
+			err := os.MkdirAll(defaultLocation, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	})
+	return defaultLocation
 }
