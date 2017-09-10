@@ -6,34 +6,41 @@ import (
 	"github.com/imyousuf/lan-messenger/network"
 )
 
-type EventListener struct {
+// EventListener encapsulates the two network interfaces into one as the application listens to both
+type EventListener interface {
+	network.BroadcastListener
+	network.MessageListener
+}
+
+type _EventListener struct {
 	completeNotificationChannel chan int
 }
 
-func (el EventListener) HandleMessageReceived(event network.MessageEvent) {
+func (el _EventListener) HandleMessageReceived(event network.MessageEvent) {
 	log.Println("MESSAGE: ", event.GetMessage())
 }
 
-func (el EventListener) HandleRegisterEvent(event network.RegisterEvent) {
+func (el _EventListener) HandleRegisterEvent(event network.RegisterEvent) {
 	log.Println("Handled RE Broadcast: ", event.GetRegisterPacket().ToJSON())
 }
 
-func (el EventListener) HandlePingEvent(event network.PingEvent) {
+func (el _EventListener) HandlePingEvent(event network.PingEvent) {
 	log.Println("Handled PE Broadcast: ", event.GetPingPacket().ToJSON())
 }
 
-func (el EventListener) HandleSignOffEvent(event network.SignOffEvent) {
+func (el _EventListener) HandleSignOffEvent(event network.SignOffEvent) {
 	log.Println("Handled SOE Broadcast: ", event.GetSignOffPacket().ToJSON())
 }
 
-func (el EventListener) HandleEndOfMessages() {
+func (el _EventListener) HandleEndOfMessages() {
 	el.completeNotificationChannel <- 1
 }
 
-func (el EventListener) HandleEndOfBroadcasts() {
+func (el _EventListener) HandleEndOfBroadcasts() {
 	el.completeNotificationChannel <- 2
 }
 
-func NewEventListener(completeNotificationChannel chan int) *EventListener {
-	return &EventListener{completeNotificationChannel: completeNotificationChannel}
+// NewEventListener creates a new instance of EventListener
+func NewEventListener(completeNotificationChannel chan int) EventListener {
+	return &_EventListener{completeNotificationChannel: completeNotificationChannel}
 }
