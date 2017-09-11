@@ -94,22 +94,37 @@ func GetUserProfile() (string, string, string) {
 
 var locationInitializer sync.Once
 
-// GetStorageLocation returns the location where application may store data
-func GetStorageLocation() string {
-	section := getOptionalSection("storage", loadConfiguration)
-	if section != nil {
-		if location, err := section.GetKey("location"); err == nil {
-			return location.String()
-		}
-	}
-	defaultLocation := filepath.Join(os.TempDir(), "lamess")
+func createStorageLocationIfNotExists(location string) error {
+	var actualError error
 	locationInitializer.Do(func() {
-		if _, err := os.Stat(defaultLocation); os.IsNotExist(err) {
-			err := os.MkdirAll(defaultLocation, os.ModePerm)
+		log.Println("Creating directories for", location)
+		if _, err := os.Stat(location); os.IsNotExist(err) {
+			err := os.MkdirAll(location, os.ModePerm)
 			if err != nil {
 				log.Println(err)
+				actualError = err
 			}
 		}
 	})
-	return defaultLocation
+	return actualError
+}
+
+// GetStorageLocation returns the location where application may store data
+func GetStorageLocation() string {
+	section := getOptionalSection("storage", loadConfiguration)
+	var storageLocation string
+	if section != nil {
+		if location, err := section.GetKey("location"); err == nil {
+			storageLocation = location.String()
+		}
+	}
+	if utils.IsStringBlank(storageLocation) {
+		defaultLocation := filepath.Join(os.TempDir(), "lamess")
+		storageLocation = defaultLocation
+	}
+	err := createStorageLocationIfNotExists(storageLocation)
+	if err != nil {
+		panic(err)
+	}
+	return storageLocation
 }

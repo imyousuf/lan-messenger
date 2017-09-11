@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-ini/ini"
@@ -17,7 +18,7 @@ const (
 	displayName     = "What to Show"
 	email           = "user@email.co"
 	deviceIndex     = 100
-	storageLocation = "/tmp/lamess1/"
+	storageLocation = "/tmp/test-lamess/"
 	iniConfigFmt    = `[network]
 	port=%d
 	interface=%s
@@ -35,13 +36,10 @@ const (
 	`
 )
 
-var (
-	iniConfig = []byte(fmt.Sprintf(iniConfigFmt, port, iface, username, displayName, email,
-		deviceIndex, storageLocation))
-	mockLoadFunc = func() (*ini.File, error) {
-		return ini.InsensitiveLoad(iniConfig)
-	}
-)
+var mockLoadFunc = func() (*ini.File, error) {
+	return ini.InsensitiveLoad([]byte(fmt.Sprintf(iniConfigFmt, port, iface, username, displayName,
+		email, deviceIndex, storageLocation)))
+}
 
 func TestMissingMandatoryConfigs(t *testing.T) {
 	loadConfiguration = func() (*ini.File, error) {
@@ -89,6 +87,7 @@ func TestGetNetworkConfig(t *testing.T) {
 
 func TestGetUserProfile(t *testing.T) {
 	loadConfiguration = mockLoadFunc
+	locationInitializer = sync.Once{}
 	if cUsername, cDisplayName, cEmail := GetUserProfile(); cUsername != username ||
 		cDisplayName != displayName || cEmail != email {
 		t.Error("User profile config not returned correctly!", cUsername, cDisplayName, cEmail,
@@ -98,8 +97,12 @@ func TestGetUserProfile(t *testing.T) {
 
 func TestGetStorageLocation(t *testing.T) {
 	loadConfiguration = mockLoadFunc
+	locationInitializer = sync.Once{}
 	if storageLocation != GetStorageLocation() {
 		t.Error("Expected storage location not returned")
+	}
+	if _, err := os.Stat(storageLocation); os.IsNotExist(err) {
+		t.Error("Storage location does not exist")
 	}
 }
 
@@ -129,6 +132,7 @@ func TestDefaultStorageLocation(t *testing.T) {
 		[device]
 		deviceindex1=0`))
 	}
+	locationInitializer = sync.Once{}
 	defaultLocation := GetStorageLocation()
 	if _, err := os.Stat(defaultLocation); os.IsNotExist(err) {
 		t.Error("Default location does not exist")
@@ -177,4 +181,21 @@ func TestMissingUserProfileConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPanicableGetStorageLocation(t *testing.T) {
+	loadConfiguration = func() (*ini.File, error) {
+		return ini.InsensitiveLoad([]byte(`
+		[storage]
+		location=/asd/0`))
+	}
+	locationInitializer = sync.Once{}
+	utils.PanicableInvocation(func() {
+		GetStorageLocation()
+		t.Error("Should have panicked when creating storage location")
+	}, func(r interface{}) {})
+}
+
+func GetTestConfiguration() func() (*ini.File, error) {
+	return mockLoadFunc
 }
