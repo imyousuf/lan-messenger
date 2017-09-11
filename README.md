@@ -1,4 +1,4 @@
-# **lamess** - lan-messenger [![Build Status](https://travis-ci.org/lamessenger/lan-messenger.svg?branch=master)](https://travis-ci.org/lamessenger/lan-messenger)
+# **lamess** - lan-messenger [![Build Status](https://travis-ci.org/lamessenger/lan-messenger.svg?branch=master)](https://travis-ci.org/lamessenger/lan-messenger) [![Go Report Card](https://goreportcard.com/badge/github.com/lamessenger/lan-messenger)](https://goreportcard.com/report/github.com/lamessenger/lan-messenger)
 A console based messenger for LANs.
 
 # Getting Started
