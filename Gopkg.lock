@@ -13,9 +13,33 @@
   revision = "064e2069ce9c359c118179501254f67d7d37ba24"
   version = "0.2"
 
+[[projects]]
+  name = "github.com/jinzhu/gorm"
+  packages = [".","dialects/sqlite"]
+  revision = "5174cc5c242a728b435ea2be8a2f7f998e15429b"
+  version = "v1.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/jinzhu/inflection"
+  packages = ["."]
+  revision = "1c35d901db3da928c72a72d8458480cc9ade058f"
+
+[[projects]]
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  revision = "ca5e3819723d8eeaf170ad510e7da1d6d2e94a08"
+  version = "v1.2.0"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "56311bc15595093369aa2383c8b32089154aa3062af8f1c2b2f833605bdb1be9"
+  inputs-digest = "09d2dc4d3c5ed22594a210833b3f72b254c340e99819f794e1cc130a23990c66"
   solver-name = "gps-cdcl"
   solver-version = 1
