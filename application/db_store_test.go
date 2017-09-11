@@ -28,7 +28,7 @@ func TestAutoMigration(t *testing.T) {
 	if err != nil {
 		t.Error("Could not run SQL against connection retrieved")
 	}
-	expectedTableNames := []string{"user_models"}
+	expectedTableNames := []string{"user_models", "session_models"}
 	expectedTableNameAssertions := make(map[string]bool)
 	for rows.Next() {
 		var tableName string

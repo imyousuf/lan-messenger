@@ -28,7 +28,7 @@ func openDBConnection() bool {
 			db, err = gorm.Open("sqlite3", filepath.Join(GetStorageLocation(), dbName))
 			if err == nil {
 				successful = true
-				db.AutoMigrate(&storage.UserModel{})
+				db.AutoMigrate(&storage.UserModel{}, &storage.SessionModel{})
 			}
 		})
 	}
