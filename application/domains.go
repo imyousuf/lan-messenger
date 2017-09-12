@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/imyousuf/lan-messenger/application/storage"
+	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
@@ -162,6 +163,11 @@ func (session Session) IsExpired() bool {
 // GetReplyToConnectionString returns the connection string for the given session to send messages to
 func (session Session) GetReplyToConnectionString() string {
 	return session.replyToConnectionString
+}
+
+// IsSelf retrieves whether the current session is of this app itself.
+func (session Session) IsSelf() bool {
+	return packet.GetCurrentSessionID() == session.sessionID
 }
 
 func (session *Session) persistSession(user *User) {

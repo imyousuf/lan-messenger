@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/imyousuf/lan-messenger/application/storage"
+	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
@@ -310,5 +311,23 @@ func TestSession_GetReplyToConnectionString(t *testing.T) {
 	log.Println("Created A1", persistedUser.AddSession(cloneSession(*mainSession)))
 	if LoadSessionFromID(sessionID).GetReplyToConnectionString() != replyToStr {
 		t.Error("Reply to string did not match")
+	}
+}
+
+func TestSession_IsSelf(t *testing.T) {
+	setupCleanTestTables()
+	sessionID := "A1"
+	secondSessionID := packet.GetCurrentSessionID()
+	devicePrefIndex := uint8(1)
+	replyToStr := "127.0.0.1:4000"
+	mainSession := NewSession(sessionID, devicePrefIndex, time.Now().Add(4*time.Minute), replyToStr)
+	secondSession := NewSession(secondSessionID, devicePrefIndex-1,
+		time.Now().Add(-4*time.Minute), replyToStr)
+	if mainSession.IsSelf() {
+		t.Error("A1 Can not be current session!")
+	}
+	if !secondSession.IsSelf() {
+		t.Error("Second one should have been current session", packet.GetCurrentSessionID(),
+			secondSession.sessionID)
 	}
 }
