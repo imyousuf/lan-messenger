@@ -22,6 +22,7 @@ func (el _EventListener) HandleMessageReceived(event network.MessageEvent) {
 
 func (el _EventListener) HandleRegisterEvent(event network.RegisterEvent) {
 	log.Println("Handled RE Broadcast: ", event.GetRegisterPacket().ToJSON())
+	NewUser(event.GetRegisterPacket().GetUserProfile())
 }
 
 func (el _EventListener) HandlePingEvent(event network.PingEvent) {

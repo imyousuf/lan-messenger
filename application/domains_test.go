@@ -200,18 +200,35 @@ func TestUser_GetActiveSessions(t *testing.T) {
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
+	expiredSessionID := "A3"
 	devicePrefIndex := uint8(0)
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
 	secondSession := NewSession(secondSessionID, devicePrefIndex+1, expiryTime, replyToStr)
+	expiredSession := NewSession(expiredSessionID, devicePrefIndex+2, expiryTime.Add(-1*time.Hour),
+		replyToStr)
 	defaultProfile := profile.NewUserProfile(GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	persistedUser.AddSession(mainSession)
 	persistedUser.AddSession(secondSession)
-	sessions := persistedUser.GetActiveSessions()
-	if len(sessions) != 2 {
-		t.Error("Did not return 2 sessions as expected")
-	}
+	persistedUser.AddSession(expiredSession)
+	t.Run("Only Active Sessions", func(t *testing.T) {
+		sessions := persistedUser.GetActiveSessions()
+		if len(sessions) != 2 {
+			t.Error("Did not return 2 sessions as expected")
+		}
+		for _, session := range sessions {
+			if session.sessionID == "A3" {
+				t.Error("Expired session returned as active sessions!")
+			}
+		}
+	})
+	t.Run("All Sessions From Private Function", func(t *testing.T) {
+		allSessions := getSessionsForUser(persistedUser)
+		if len(allSessions) != 3 {
+			t.Error("Did not return 2 sessions as expected")
+		}
+	})
 }
 
 func TestUser_GetMainSession(t *testing.T) {

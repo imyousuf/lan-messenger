@@ -86,7 +86,14 @@ func (user *User) AddSession(session *Session) bool {
 
 // GetActiveSessions get currently active sessions
 func (user *User) GetActiveSessions() []*Session {
-	return getSessionsForUser(user)
+	allSessions := getSessionsForUser(user)
+	activeSessions := make([]*Session, 0, len(allSessions))
+	for _, aSession := range allSessions {
+		if !aSession.IsExpired() {
+			activeSessions = append(activeSessions, aSession)
+		}
+	}
+	return activeSessions
 }
 
 // GetMainSession gets the session with lowest device preference index for the given user
