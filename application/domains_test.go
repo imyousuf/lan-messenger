@@ -38,6 +38,8 @@ func checkRowCount(row *sql.Row, expectedRowCount uint) bool {
 	return actualCount == expectedRowCount
 }
 
+// **************** User ****************
+
 func assertUserProfileData(userProfile profile.UserProfile, user *User, t *testing.T) {
 	if userProfile.GetDisplayName() != user.GetUserProfile().GetDisplayName() ||
 		userProfile.GetEmail() != user.GetUserProfile().GetEmail() ||
@@ -109,6 +111,8 @@ func TestUser_GetUserProfile(t *testing.T) {
 		t.Error("Correct instace of user profile not set")
 	}
 }
+
+// **************** Session ****************
 
 func cloneSession(session Session) *Session {
 	session.sessionModel = &storage.SessionModel{}
@@ -347,4 +351,47 @@ func TestSession_IsSelf(t *testing.T) {
 		t.Error("Second one should have been current session", packet.GetCurrentSessionID(),
 			secondSession.sessionID)
 	}
+}
+
+func TestSession_Renew(t *testing.T) {
+	setupCleanTestTables()
+	expiryTime := time.Now().Add(4 * time.Minute)
+	sessionID := "A1"
+	secondSessionID := "A2"
+	devicePrefIndex := uint8(1)
+	replyToStr := "127.0.0.1:4000"
+	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
+	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
+	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	persistedUser := NewUser(defaultProfile)
+	t.Run("Test Invalid renewal time", func(t *testing.T) {
+		unsavedSession := cloneSession(*mainSession)
+		err := unsavedSession.Renew(time.Now().Add(1 * time.Hour))
+		if err == nil {
+			t.Error("Did not receive error")
+		}
+	})
+	t.Run("Test Invalid renewal time", func(t *testing.T) {
+		firstSession := cloneSession(*mainSession)
+		persistedUser.AddSession(firstSession)
+		err := firstSession.Renew(time.Now().Add(-1 * time.Hour))
+		if err == nil || err.Error() != InvalidRenewTimeErrorMsg {
+			t.Error("Did not receive invalid time error")
+		}
+	})
+	t.Run("Test valid renewal time", func(t *testing.T) {
+		secondSession := cloneSession(*secondSession)
+		persistedUser.AddSession(secondSession)
+		newExpiryTime := time.Now().Add(time.Hour)
+		err := secondSession.Renew(newExpiryTime)
+		if err != nil {
+			t.Error("Renew was not successful!")
+		}
+		if !secondSession.expiryTime.Equal(newExpiryTime) {
+			t.Error("New Expiry time value not set correctly")
+		}
+		if !secondSession.sessionModel.ExpiryTime.Equal(newExpiryTime) {
+			t.Error("New Expiry time value in model not set correctly")
+		}
+	})
 }

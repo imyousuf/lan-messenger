@@ -1,6 +1,7 @@
 package application
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,14 @@ type InvalidStateError string
 
 // SaveOperationFailedError represents a DB.Save() operation failure
 type SaveOperationFailedError string
+
+const (
+	// InvalidRenewTimeErrorMsg should be sent when time for new expiry is
+	// earlier than current time
+	InvalidRenewTimeErrorMsg = "renew time can not be from past"
+	// RenewFailureMsg should returned whenever the update to DB fails.
+	RenewFailureMsg = "renew session failed"
+)
 
 // ******************** User ********************
 
@@ -175,6 +184,20 @@ func (session Session) GetReplyToConnectionString() string {
 // IsSelf retrieves whether the current session is of this app itself.
 func (session Session) IsSelf() bool {
 	return packet.GetCurrentSessionID() == session.sessionID
+}
+
+// Renew - as the name suggests, renews the session till the newly specified time
+func (session *Session) Renew(newExpiryTime time.Time) error {
+	if time.Now().After(newExpiryTime) {
+		return errors.New(InvalidRenewTimeErrorMsg)
+	}
+	rowsAffected := GetDB().Model(session.sessionModel).
+		Updates(storage.SessionModel{ExpiryTime: newExpiryTime}).RowsAffected
+	if rowsAffected < 1 {
+		return errors.New(RenewFailureMsg)
+	}
+	session.expiryTime = newExpiryTime.Truncate(time.Nanosecond)
+	return nil
 }
 
 func (session *Session) persistSession(user *User) {
