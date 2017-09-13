@@ -362,21 +362,24 @@ func TestSession_Renew(t *testing.T) {
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
 	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
+	thirdSessionID := "A3"
+	thirdSession := NewSession(thirdSessionID, devicePrefIndex-2, expiryTime, replyToStr)
 	defaultProfile := profile.NewUserProfile(GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
-	t.Run("Test Invalid renewal time", func(t *testing.T) {
-		unsavedSession := cloneSession(*mainSession)
-		err := unsavedSession.Renew(time.Now().Add(1 * time.Hour))
-		if err == nil {
-			t.Error("Did not receive error")
-		}
-	})
+	persistedUser.AddSession(thirdSession)
 	t.Run("Test Invalid renewal time", func(t *testing.T) {
 		firstSession := cloneSession(*mainSession)
 		persistedUser.AddSession(firstSession)
 		err := firstSession.Renew(time.Now().Add(-1 * time.Hour))
 		if err == nil || err.Error() != InvalidRenewTimeErrorMsg {
 			t.Error("Did not receive invalid time error")
+		}
+	})
+	t.Run("Test Invalid renewal time", func(t *testing.T) {
+		unsavedSession := cloneSession(*mainSession)
+		err := unsavedSession.Renew(time.Now().Add(1 * time.Hour))
+		if err == nil {
+			t.Error("Did not receive error")
 		}
 	})
 	t.Run("Test valid renewal time", func(t *testing.T) {
@@ -392,6 +395,41 @@ func TestSession_Renew(t *testing.T) {
 		}
 		if !secondSession.sessionModel.ExpiryTime.Equal(newExpiryTime) {
 			t.Error("New Expiry time value in model not set correctly")
+		}
+	})
+}
+
+func TestSession_SignOff(t *testing.T) {
+	setupCleanTestTables()
+	expiryTime := time.Now().Add(4 * time.Minute)
+	sessionID := "A1"
+	devicePrefIndex := uint8(5)
+	replyToStr := "127.0.0.1:4000"
+	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
+	secondSessionID := "A2"
+	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
+	thirdSessionID := "A3"
+	thirdSession := NewSession(thirdSessionID, devicePrefIndex-2, expiryTime, replyToStr)
+	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	persistedUser := NewUser(defaultProfile)
+	persistedUser.AddSession(thirdSession)
+	t.Run("sign off persisted session", func(t *testing.T) {
+		pMainSession := cloneSession(*mainSession)
+		persistedUser.AddSession(pMainSession)
+		if err := pMainSession.SignOff(); err != nil {
+			t.Error("Should not have been any error signing off")
+		}
+		if !pMainSession.IsExpired() {
+			t.Error("Session should have been expired")
+		}
+	})
+	t.Run("sign off non-persisted session", func(t *testing.T) {
+		pMainSession := cloneSession(*secondSession)
+		if err := pMainSession.SignOff(); err == nil {
+			t.Error("Should have been error signing off")
+		}
+		if pMainSession.IsExpired() {
+			t.Error("Session should not have been expired")
 		}
 	})
 }

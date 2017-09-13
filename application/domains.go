@@ -186,18 +186,34 @@ func (session Session) IsSelf() bool {
 	return packet.GetCurrentSessionID() == session.sessionID
 }
 
-// Renew - as the name suggests, renews the session till the newly specified time
-func (session *Session) Renew(newExpiryTime time.Time) error {
-	if time.Now().After(newExpiryTime) {
-		return errors.New(InvalidRenewTimeErrorMsg)
+func (session *Session) updateExpiryTime(newExpiryTime time.Time) error {
+	if !session.IsPersisted() {
+		return errors.New(RenewFailureMsg)
 	}
 	rowsAffected := GetDB().Model(session.sessionModel).
 		Updates(storage.SessionModel{ExpiryTime: newExpiryTime}).RowsAffected
 	if rowsAffected < 1 {
 		return errors.New(RenewFailureMsg)
 	}
+	// This should not ever happen, but if happens the program should exit
+	if rowsAffected > 1 {
+		panic("data corrupted")
+	}
 	session.expiryTime = newExpiryTime.Truncate(time.Nanosecond)
 	return nil
+}
+
+// Renew - as the name suggests, renews the session till the newly specified time
+func (session *Session) Renew(newExpiryTime time.Time) error {
+	if time.Now().After(newExpiryTime) {
+		return errors.New(InvalidRenewTimeErrorMsg)
+	}
+	return session.updateExpiryTime(newExpiryTime)
+}
+
+// SignOff force expires the current session
+func (session *Session) SignOff() error {
+	return session.updateExpiryTime(time.Now().Add(-100 * time.Millisecond))
 }
 
 func (session *Session) persistSession(user *User) {
