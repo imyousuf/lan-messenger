@@ -72,14 +72,14 @@ func TestNewUser(t *testing.T) {
 func TestGetUserByUsername(t *testing.T) {
 	setupCleanTestTables()
 	uProfile := profile.NewUserProfile(GetUserProfile())
-	user := GetUserByUsername(uProfile.GetUsername())
-	if !GetDB().NewRecord(user.userModel) {
+	user, found := GetUserByUsername(uProfile.GetUsername())
+	if found || !GetDB().NewRecord(user.userModel) {
 		t.Error("Should not have found any record!")
 	}
 	NewUser(uProfile)
-	user = GetUserByUsername(uProfile.GetUsername())
+	user, found = GetUserByUsername(uProfile.GetUsername())
 	assertUserProfileData(uProfile, user, t)
-	if GetDB().NewRecord(user.userModel) {
+	if !found || GetDB().NewRecord(user.userModel) {
 		t.Error("Should have found record!")
 	}
 }
@@ -87,8 +87,8 @@ func TestGetUserByUsername(t *testing.T) {
 func TestUser_IsPersisted(t *testing.T) {
 	setupCleanTestTables()
 	uProfile := profile.NewUserProfile(GetUserProfile())
-	user := GetUserByUsername(uProfile.GetUsername())
-	if user.IsPersisted() {
+	user, found := GetUserByUsername(uProfile.GetUsername())
+	if found || user.IsPersisted() {
 		t.Error("Should not have found any record!")
 	}
 	for i := 0; i < 3; i++ {
@@ -97,8 +97,8 @@ func TestUser_IsPersisted(t *testing.T) {
 			t.Error("Should have found record!")
 		}
 	}
-	user = GetUserByUsername(uProfile.GetUsername())
-	if !user.IsPersisted() {
+	user, found = GetUserByUsername(uProfile.GetUsername())
+	if !found || !user.IsPersisted() {
 		t.Error("Should have found record!")
 	}
 }
@@ -258,7 +258,7 @@ func TestUser_GetMainSession(t *testing.T) {
 	}
 }
 
-func TestLoadSessionFromID(t *testing.T) {
+func TestGetSessionBySessionID(t *testing.T) {
 	setupCleanTestTables()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
@@ -272,7 +272,7 @@ func TestLoadSessionFromID(t *testing.T) {
 	log.Println("Created A1", persistedUser.AddSession(cloneSession(*mainSession)))
 	log.Println("Created A2", persistedUser.AddSession(cloneSession(*secondSession)))
 	t.Run("Load A1", func(t *testing.T) {
-		a1Session := LoadSessionFromID(sessionID)
+		a1Session, _ := GetSessionBySessionID(sessionID)
 		if !a1Session.expiryTime.Equal(expiryTime) {
 			t.Error("A1 Expiry time does not match", expiryTime, a1Session.expiryTime)
 		}
@@ -284,20 +284,20 @@ func TestLoadSessionFromID(t *testing.T) {
 		}
 	})
 	t.Run("Load A2", func(t *testing.T) {
-		a2Session := LoadSessionFromID(secondSessionID)
-		if !a2Session.expiryTime.Equal(expiryTime) {
+		a2Session, found := GetSessionBySessionID(secondSessionID)
+		if !found || !a2Session.expiryTime.Equal(expiryTime) {
 			t.Error("A2 Expiry time does not match", expiryTime, a2Session.expiryTime)
 		}
-		if a2Session.devicePreferenceIndex != devicePrefIndex-1 {
+		if !found || a2Session.devicePreferenceIndex != devicePrefIndex-1 {
 			t.Error("A2 device index did not match")
 		}
-		if a2Session.sessionID != secondSessionID {
+		if !found || a2Session.sessionID != secondSessionID {
 			t.Error("A1 session id did not match")
 		}
 	})
 	t.Run("Load A3", func(t *testing.T) {
-		a3Session := LoadSessionFromID("A3")
-		if a3Session.IsPersisted() {
+		a3Session, found := GetSessionBySessionID("A3")
+		if found || a3Session.IsPersisted() {
 			t.Error("A3 should have been found")
 		}
 	})
@@ -330,7 +330,7 @@ func TestSession_GetReplyToConnectionString(t *testing.T) {
 	defaultProfile := profile.NewUserProfile(GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	log.Println("Created A1", persistedUser.AddSession(cloneSession(*mainSession)))
-	if LoadSessionFromID(sessionID).GetReplyToConnectionString() != replyToStr {
+	if session, found := GetSessionBySessionID(sessionID); found && session.GetReplyToConnectionString() != replyToStr {
 		t.Error("Reply to string did not match")
 	}
 }

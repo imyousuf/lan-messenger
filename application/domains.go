@@ -140,13 +140,13 @@ func populateUserFromModel(user *User, userModel *storage.UserModel) {
 }
 
 // GetUserByUsername retrieves the user signified by username
-func GetUserByUsername(username string) *User {
+func GetUserByUsername(username string) (*User, bool) {
 	user := &User{}
 	userModel, found := getUserModelByUsername(username)
 	if found {
 		populateUserFromModel(user, userModel)
 	}
-	return user
+	return user, found
 }
 
 // ******************** Session ********************
@@ -260,15 +260,17 @@ func getSessionsForUser(user *User) []*Session {
 	return sessions
 }
 
-// LoadSessionFromID loads from DB with the matching session id
-func LoadSessionFromID(sessionID string) *Session {
+// GetSessionBySessionID loads from DB with the matching session id
+func GetSessionBySessionID(sessionID string) (*Session, bool) {
 	sessionModel := &storage.SessionModel{}
 	GetDB().Where(storage.SessionModel{SessionID: sessionID}).First(sessionModel)
 	session := getSessionFromModel(sessionModel)
+	found := false
 	if session.IsPersisted() {
 		loadUserFromSession(session)
+		found = true
 	}
-	return session
+	return session, found
 }
 
 // NewSession creates a non-persisted new Session to be added to a user
