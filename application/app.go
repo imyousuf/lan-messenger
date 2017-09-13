@@ -2,6 +2,7 @@ package application
 
 import (
 	"log"
+	"time"
 
 	"github.com/imyousuf/lan-messenger/network"
 )
@@ -21,16 +22,31 @@ func (el _EventListener) HandleMessageReceived(event network.MessageEvent) {
 }
 
 func (el _EventListener) HandleRegisterEvent(event network.RegisterEvent) {
-	log.Println("Handled RE Broadcast: ", event.GetRegisterPacket().ToJSON())
-	NewUser(event.GetRegisterPacket().GetUserProfile())
+	regPacket := event.GetRegisterPacket()
+	log.Println("Handled RE Broadcast: ", regPacket.ToJSON())
+	user := NewUser(regPacket.GetUserProfile())
+	session := NewSession(regPacket.GetSessionID(), regPacket.GetDevicePreferenceIndex(),
+		regPacket.GetExpiryTime(), regPacket.GetReplyTo())
+	user.AddSession(session)
 }
 
 func (el _EventListener) HandlePingEvent(event network.PingEvent) {
-	log.Println("Handled PE Broadcast: ", event.GetPingPacket().ToJSON())
+	pingPacket := event.GetPingPacket()
+	log.Println("Handled PE Broadcast: ", pingPacket.ToJSON())
+	if session, found := GetSessionBySessionID(pingPacket.GetSessionID()); found &&
+		pingPacket.GetExpiryTime().After(time.Now()) {
+		if err := session.Renew(pingPacket.GetExpiryTime()); err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 func (el _EventListener) HandleSignOffEvent(event network.SignOffEvent) {
-	log.Println("Handled SOE Broadcast: ", event.GetSignOffPacket().ToJSON())
+	signoffPacket := event.GetSignOffPacket()
+	log.Println("Handled SOE Broadcast: ", signoffPacket.ToJSON())
+	if session, found := GetSessionBySessionID(signoffPacket.GetSessionID()); found {
+		session.SignOff()
+	}
 }
 
 func (el _EventListener) HandleEndOfMessages() {

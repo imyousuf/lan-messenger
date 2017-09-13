@@ -21,8 +21,12 @@ const (
 
 var globalDbSetupForDomainTests = sync.Once{}
 
-func setupCleanTestTables() {
-	globalDbSetupForDomainTests.Do(func() {
+func setupCleanTestTablesForDomainTests() {
+	setupCleanTestTablesWithInitializer(&globalDbSetupForDomainTests)
+}
+
+func setupCleanTestTablesWithInitializer(dbSetupInitializer *sync.Once) {
+	dbSetupInitializer.Do(func() {
 		loadConfiguration = GetTestConfiguration()
 		locationInitializer = sync.Once{}
 		dbInitializer = sync.Once{}
@@ -49,7 +53,7 @@ func assertUserProfileData(userProfile profile.UserProfile, user *User, t *testi
 }
 
 func TestNewUser(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	uProfile := profile.NewUserProfile(GetUserProfile())
 	user := NewUser(uProfile)
 	if GetDB().NewRecord(&user.userModel) || user.userProfile == nil {
@@ -70,7 +74,7 @@ func TestNewUser(t *testing.T) {
 }
 
 func TestGetUserByUsername(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	uProfile := profile.NewUserProfile(GetUserProfile())
 	user, found := GetUserByUsername(uProfile.GetUsername())
 	if found || !GetDB().NewRecord(user.userModel) {
@@ -85,7 +89,7 @@ func TestGetUserByUsername(t *testing.T) {
 }
 
 func TestUser_IsPersisted(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	uProfile := profile.NewUserProfile(GetUserProfile())
 	user, found := GetUserByUsername(uProfile.GetUsername())
 	if found || user.IsPersisted() {
@@ -104,7 +108,7 @@ func TestUser_IsPersisted(t *testing.T) {
 }
 
 func TestUser_GetUserProfile(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	uProfile := profile.NewUserProfile(GetUserProfile())
 	user := NewUser(uProfile)
 	if user.GetUserProfile() == nil || uProfile != user.GetUserProfile() {
@@ -120,7 +124,7 @@ func cloneSession(session Session) *Session {
 }
 
 func TestUser_AddSession(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
@@ -200,7 +204,7 @@ func TestUser_AddSession(t *testing.T) {
 }
 
 func TestUser_GetActiveSessions(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
@@ -236,7 +240,7 @@ func TestUser_GetActiveSessions(t *testing.T) {
 }
 
 func TestUser_GetMainSession(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
@@ -259,7 +263,7 @@ func TestUser_GetMainSession(t *testing.T) {
 }
 
 func TestGetSessionBySessionID(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
@@ -304,7 +308,7 @@ func TestGetSessionBySessionID(t *testing.T) {
 }
 
 func TestSession_IsExpired(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	sessionID := "A1"
 	secondSessionID := "A2"
 	devicePrefIndex := uint8(1)
@@ -321,7 +325,7 @@ func TestSession_IsExpired(t *testing.T) {
 }
 
 func TestSession_GetReplyToConnectionString(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	devicePrefIndex := uint8(1)
@@ -336,7 +340,7 @@ func TestSession_GetReplyToConnectionString(t *testing.T) {
 }
 
 func TestSession_IsSelf(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	sessionID := "A1"
 	secondSessionID := packet.GetCurrentSessionID()
 	devicePrefIndex := uint8(1)
@@ -354,7 +358,7 @@ func TestSession_IsSelf(t *testing.T) {
 }
 
 func TestSession_Renew(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	secondSessionID := "A2"
@@ -390,17 +394,18 @@ func TestSession_Renew(t *testing.T) {
 		if err != nil {
 			t.Error("Renew was not successful!")
 		}
-		if !secondSession.expiryTime.Equal(newExpiryTime) {
+		secondSession, found := GetSessionBySessionID(secondSessionID)
+		if !found || !secondSession.expiryTime.Equal(newExpiryTime) {
 			t.Error("New Expiry time value not set correctly")
 		}
-		if !secondSession.sessionModel.ExpiryTime.Equal(newExpiryTime) {
+		if !found || !secondSession.sessionModel.ExpiryTime.Equal(newExpiryTime) {
 			t.Error("New Expiry time value in model not set correctly")
 		}
 	})
 }
 
 func TestSession_SignOff(t *testing.T) {
-	setupCleanTestTables()
+	setupCleanTestTablesForDomainTests()
 	expiryTime := time.Now().Add(4 * time.Minute)
 	sessionID := "A1"
 	devicePrefIndex := uint8(5)
