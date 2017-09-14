@@ -7,14 +7,22 @@ import (
 )
 
 const (
-	Port            = 34534
-	Iface           = "eth0"
-	Username        = "nicename"
-	DisplayName     = "What to Show"
-	Email           = "user@email.co"
-	DeviceIndex     = 100
+	// Port - Test port for the App
+	Port = 34534
+	// Iface -Test interface name
+	Iface = "eth0"
+	// Username - Test username for the mocking
+	Username = "nicename"
+	// DisplayName - Test name to display in the app
+	DisplayName = "What to Show"
+	// Email - Test email for the test user
+	Email = "user@email.co"
+	// DeviceIndex - Test device index
+	DeviceIndex = 100
+	// StorageLocation - Test location for storing information
 	StorageLocation = "/tmp/test-lamess/"
-	IniConfigFmt    = `[network]
+	// IniConfigFmt - Configuration string representing mock configuration
+	IniConfigFmt = `[network]
 	port=%d
 	interface=%s
 	
@@ -29,7 +37,9 @@ const (
 	[storage]
 	location=%s
 	`
-	DeleteUserModelsSQL    = "DELETE FROM user_models"
+	// DeleteUserModelsSQL - The SQL for deleting all user model rows
+	DeleteUserModelsSQL = "DELETE FROM user_models"
+	// DeleteSessionModelsSQL - The SQL for deleting all session
 	DeleteSessionModelsSQL = "DELETE FROM session_models"
 )
 

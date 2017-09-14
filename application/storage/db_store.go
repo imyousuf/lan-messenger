@@ -6,6 +6,7 @@ import (
 
 	app "github.com/imyousuf/lan-messenger/application/conf"
 	"github.com/jinzhu/gorm"
+	// Import the SQLite dialect which is used in this project
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 

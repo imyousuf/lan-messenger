@@ -59,8 +59,8 @@ type _MessageEvent struct {
 	message string
 }
 
-func (me _MessageEvent) GetMessage() string {
-	return me.message
+func (msgEvent _MessageEvent) GetMessage() string {
+	return msgEvent.message
 }
 
 // Communication defines the interface the application uses to communicate between
