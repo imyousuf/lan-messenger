@@ -5,10 +5,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/imyousuf/lan-messenger/application/conf"
+	"github.com/imyousuf/lan-messenger/application/domains"
+	s "github.com/imyousuf/lan-messenger/application/storage"
+	"github.com/imyousuf/lan-messenger/application/testutils"
 	"github.com/imyousuf/lan-messenger/network"
 	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
 )
+
+//
 
 func TestHandleEndOfMessages(t *testing.T) {
 	endOfMsgChan := make(chan int)
@@ -43,7 +49,13 @@ func TestHandleEndOfBroadcasts(t *testing.T) {
 var globalDbSetupForAppTests = sync.Once{}
 
 func setupCleanTestTablesForHandlerTests() {
-	setupCleanTestTablesWithInitializer(&globalDbSetupForAppTests)
+	globalDbSetupForAppTests.Do(func() {
+		conf.SetupNewConfiguration(testutils.MockLoadFunc)
+		s.ReInitDBConnection()
+	})
+	s.GetDB().Exec(testutils.DeleteSessionModelsSQL)
+	s.GetDB().Exec(testutils.DeleteUserModelsSQL)
+
 }
 
 type _MockRegisterEvent struct {
@@ -64,7 +76,7 @@ func (mockEvent *_MockRegisterEvent) GetRegisterPacket() packet.RegisterPacket {
 	mockEvent.packetInitializer.Do(func() {
 		mockEvent.regPacket = packet.NewBuilderFactory().
 			CreateNewSession().CreateSession(5*time.Minute).
-			CreateUserProfile(profile.NewUserProfile(GetUserProfile())).
+			CreateUserProfile(profile.NewUserProfile(conf.GetUserProfile())).
 			RegisterDevice("127.0.0.1:30000", 1).BuildRegisterPacket()
 	})
 	return mockEvent.regPacket
@@ -76,7 +88,7 @@ func TestHandleRegisterEvent(t *testing.T) {
 	eventListener := NewEventListener(endOfBroadcastChan)
 	regEvent := &_MockRegisterEvent{}
 	eventListener.HandleRegisterEvent(regEvent)
-	loadedSession, found := GetSessionBySessionID(regEvent.GetRegisterPacket().GetSessionID())
+	loadedSession, found := domains.GetSessionBySessionID(regEvent.GetRegisterPacket().GetSessionID())
 	if !found {
 		t.Error("Could not find the session just registered")
 	}
@@ -111,13 +123,13 @@ func TestHandlePingEvent(t *testing.T) {
 	eventListener.HandleRegisterEvent(regEvent)
 	pingEvent := &_MockPingEvent{}
 	eventListener.HandlePingEvent(pingEvent)
-	loadedSession, found := GetSessionBySessionID(pingEvent.GetPingPacket().GetSessionID())
+	loadedSession, found := domains.GetSessionBySessionID(pingEvent.GetPingPacket().GetSessionID())
 	if !found {
 		t.Error("Could not find the session just registered")
 	}
 	newExpiryTime := pingEvent.GetPingPacket().GetExpiryTime().Truncate(time.Second)
-	if !loadedSession.expiryTime.Truncate(time.Second).Equal(newExpiryTime) {
-		t.Error("Expiry time not updated", loadedSession.expiryTime, newExpiryTime)
+	if !loadedSession.GetExpiryTime().Truncate(time.Second).Equal(newExpiryTime) {
+		t.Error("Expiry time not updated", loadedSession.GetExpiryTime(), newExpiryTime)
 	}
 }
 
@@ -145,7 +157,7 @@ func TestHandleSignOffEvent(t *testing.T) {
 	eventListener.HandleRegisterEvent(regEvent)
 	signOffEvent := _MockSignOffEvent{}
 	eventListener.HandleSignOffEvent(signOffEvent)
-	loadedSession, found := GetSessionBySessionID(signOffEvent.GetSignOffPacket().GetSessionID())
+	loadedSession, found := domains.GetSessionBySessionID(signOffEvent.GetSignOffPacket().GetSessionID())
 	if !found {
 		t.Error("Could not find the session just registered")
 	}

@@ -1,15 +1,16 @@
-package application
+package storage
 
 import (
-	"sync"
 	"testing"
+
+	"github.com/imyousuf/lan-messenger/application/conf"
+	"github.com/imyousuf/lan-messenger/application/testutils"
 )
 
 const getCreatedTablesSqliteSQL = "SELECT tbl_name FROM sqlite_master where type = 'table'"
 
 func TestDBConnectionInitiation(t *testing.T) {
-	loadConfiguration = GetTestConfiguration()
-	locationInitializer = sync.Once{}
+	conf.SetupNewConfiguration(testutils.MockLoadFunc)
 	if !IsDBConnectionAvailable() {
 		t.Error("DB connection should have been available")
 	}

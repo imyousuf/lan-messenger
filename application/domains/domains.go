@@ -1,4 +1,4 @@
-package application
+package domains
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/imyousuf/lan-messenger/application/storage"
+	s "github.com/imyousuf/lan-messenger/application/storage"
 	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
@@ -35,7 +35,7 @@ var userMutex sync.Mutex
 // User represents a User of the application
 type User struct {
 	userProfile profile.UserProfile
-	userModel   *storage.UserModel
+	userModel   *s.UserModel
 }
 
 func (user *User) persistOrLoad() {
@@ -48,7 +48,7 @@ func (user *User) persistOrLoad() {
 		} else {
 			userModel.Username, userModel.DisplayName, userModel.Email = user.userProfile.GetUsername(),
 				user.userProfile.GetDisplayName(), user.userProfile.GetEmail()
-			GetDB().Create(userModel)
+			s.GetDB().Create(userModel)
 			user.userModel = userModel
 		}
 	}
@@ -61,7 +61,7 @@ func (user User) GetUserProfile() profile.UserProfile {
 
 // IsPersisted returns whether the instance represents a persisted model
 func (user User) IsPersisted() bool {
-	return !GetDB().NewRecord(user.userModel)
+	return !s.GetDB().NewRecord(user.userModel)
 }
 
 // AddSession adds a session to the user. One can only add a non-persisted session to a persisted
@@ -109,7 +109,7 @@ func (user *User) GetActiveSessions() []*Session {
 func (user User) GetMainSession() (*Session, bool) {
 	sessions := user.GetActiveSessions()
 	if len(sessions) <= 0 {
-		return &Session{sessionModel: &storage.SessionModel{}}, false
+		return &Session{sessionModel: &s.SessionModel{}}, false
 	}
 	mainSession := sessions[0]
 	for _, session := range sessions {
@@ -120,9 +120,9 @@ func (user User) GetMainSession() (*Session, bool) {
 	return mainSession, true
 }
 
-func getUserModelByUsername(username string) (*storage.UserModel, bool) {
-	userModel := &storage.UserModel{}
-	newDB := GetDB().Where("username = ?", username).First(userModel)
+func getUserModelByUsername(username string) (*s.UserModel, bool) {
+	userModel := &s.UserModel{}
+	newDB := s.GetDB().Where("username = ?", username).First(userModel)
 	return userModel, !newDB.RecordNotFound()
 }
 
@@ -133,7 +133,7 @@ func NewUser(userProfile profile.UserProfile) *User {
 	return user
 }
 
-func populateUserFromModel(user *User, userModel *storage.UserModel) {
+func populateUserFromModel(user *User, userModel *s.UserModel) {
 	user.userModel = userModel
 	user.userProfile = profile.NewUserProfile(userModel.Username, userModel.DisplayName,
 		userModel.Email)
@@ -153,7 +153,7 @@ func GetUserByUsername(username string) (*User, bool) {
 
 // Session represents a user's session
 type Session struct {
-	sessionModel            *storage.SessionModel
+	sessionModel            *s.SessionModel
 	user                    *User
 	sessionID               string
 	devicePreferenceIndex   uint8
@@ -163,12 +163,17 @@ type Session struct {
 
 // IsPersisted returns whether the instance represents a persisted model
 func (session Session) IsPersisted() bool {
-	return !GetDB().NewRecord(session.sessionModel)
+	return !s.GetDB().NewRecord(session.sessionModel)
 }
 
 // GetSessionOwner returns the User who owns this session instance
 func (session Session) GetSessionOwner() *User {
 	return session.user
+}
+
+// GetExpiryTime returns the expiry time of this session
+func (session Session) GetExpiryTime() time.Time {
+	return session.expiryTime
 }
 
 // IsExpired evaluates whether the session is expired or not. True is returned if the session is expired
@@ -190,8 +195,8 @@ func (session *Session) updateExpiryTime(newExpiryTime time.Time) error {
 	if !session.IsPersisted() {
 		return errors.New(RenewFailureMsg)
 	}
-	rowsAffected := GetDB().Model(session.sessionModel).
-		Updates(storage.SessionModel{ExpiryTime: newExpiryTime}).RowsAffected
+	rowsAffected := s.GetDB().Model(session.sessionModel).
+		Updates(s.SessionModel{ExpiryTime: newExpiryTime}).RowsAffected
 	if rowsAffected < 1 {
 		return errors.New(RenewFailureMsg)
 	}
@@ -223,7 +228,7 @@ func (session *Session) persistSession(user *User) {
 	sessionModel.ExpiryTime = session.expiryTime
 	sessionModel.SessionID = session.sessionID
 	sessionModel.ReplyToConnectionString = session.replyToConnectionString
-	saveResultDB := GetDB().Save(sessionModel)
+	saveResultDB := s.GetDB().Save(sessionModel)
 	if saveResultDB.Error != nil {
 		if strings.Contains(saveResultDB.Error.Error(), "UNIQUE constraint failed") {
 			panic(SaveOperationFailedError(saveResultDB.Error.Error()))
@@ -234,7 +239,7 @@ func (session *Session) persistSession(user *User) {
 	session.user = user
 }
 
-func getSessionFromModel(sessionModel *storage.SessionModel) *Session {
+func getSessionFromModel(sessionModel *s.SessionModel) *Session {
 	session := &Session{sessionID: sessionModel.SessionID, sessionModel: sessionModel,
 		devicePreferenceIndex: sessionModel.DevicePreferenceIndex, expiryTime: sessionModel.ExpiryTime,
 		replyToConnectionString: sessionModel.ReplyToConnectionString}
@@ -243,15 +248,15 @@ func getSessionFromModel(sessionModel *storage.SessionModel) *Session {
 
 func loadUserFromSession(session *Session) {
 	sessionModel := session.sessionModel
-	GetDB().Model(sessionModel).Related(&sessionModel.UserModel)
+	s.GetDB().Model(sessionModel).Related(&sessionModel.UserModel)
 	user := &User{}
 	populateUserFromModel(user, &sessionModel.UserModel)
 	session.user = user
 }
 
 func getSessionsForUser(user *User) []*Session {
-	sessionModels := []storage.SessionModel{}
-	GetDB().Find(&sessionModels, storage.SessionModel{UserModelID: user.userModel.ID})
+	sessionModels := []s.SessionModel{}
+	s.GetDB().Find(&sessionModels, s.SessionModel{UserModelID: user.userModel.ID})
 	sessions := make([]*Session, len(sessionModels), len(sessionModels))
 	for index, sessionModel := range sessionModels {
 		sessions[index] = getSessionFromModel(&sessionModel)
@@ -262,8 +267,8 @@ func getSessionsForUser(user *User) []*Session {
 
 // GetSessionBySessionID loads from DB with the matching session id
 func GetSessionBySessionID(sessionID string) (*Session, bool) {
-	sessionModel := &storage.SessionModel{}
-	GetDB().Where(storage.SessionModel{SessionID: sessionID}).First(sessionModel)
+	sessionModel := &s.SessionModel{}
+	s.GetDB().Where(s.SessionModel{SessionID: sessionID}).First(sessionModel)
 	session := getSessionFromModel(sessionModel)
 	found := false
 	if session.IsPersisted() {
@@ -277,6 +282,6 @@ func GetSessionBySessionID(sessionID string) (*Session, bool) {
 func NewSession(sessionID string, devicePreferenceIndex uint8, expiryTime time.Time,
 	replyTo string) *Session {
 	session := &Session{sessionID: sessionID, devicePreferenceIndex: devicePreferenceIndex,
-		expiryTime: expiryTime, replyToConnectionString: replyTo, sessionModel: &storage.SessionModel{}}
+		expiryTime: expiryTime, replyToConnectionString: replyTo, sessionModel: &s.SessionModel{}}
 	return session
 }

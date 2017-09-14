@@ -5,6 +5,7 @@ import (
 	"os/signal"
 
 	app "github.com/imyousuf/lan-messenger/application"
+	conf "github.com/imyousuf/lan-messenger/application/conf"
 	"github.com/imyousuf/lan-messenger/network"
 	"github.com/imyousuf/lan-messenger/profile"
 )
@@ -22,12 +23,12 @@ func main() {
 	completeNotificationChannel := make(chan int)
 	messageListener := app.NewEventListener(completeNotificationChannel)
 	udpComm := network.NewUDPCommunication()
-	config := network.NewConfig(app.GetNetworkConfig())
+	config := network.NewConfig(conf.GetNetworkConfig())
 	exit(udpComm)
 	udpComm.AddMessageListener(messageListener)
 	udpComm.AddBroadcastListener(messageListener)
 	udpComm.SetupCommunication(config)
-	udpComm.InitCommunication(profile.NewUserProfile(app.GetUserProfile()))
+	udpComm.InitCommunication(profile.NewUserProfile(conf.GetUserProfile()))
 	<-completeNotificationChannel
 	<-completeNotificationChannel
 }

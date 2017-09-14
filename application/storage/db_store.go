@@ -1,10 +1,10 @@
-package application
+package storage
 
 import (
 	"path/filepath"
 	"sync"
 
-	"github.com/imyousuf/lan-messenger/application/storage"
+	app "github.com/imyousuf/lan-messenger/application/conf"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
@@ -25,10 +25,10 @@ func openDBConnection() bool {
 	if !successful {
 		var err error
 		dbInitializer.Do(func() {
-			db, err = gorm.Open("sqlite3", filepath.Join(GetStorageLocation(), dbName))
+			db, err = gorm.Open("sqlite3", filepath.Join(app.GetStorageLocation(), dbName))
 			if err == nil {
 				successful = true
-				db.AutoMigrate(&storage.UserModel{}, &storage.SessionModel{})
+				db.AutoMigrate(&UserModel{}, &SessionModel{})
 			}
 		})
 	}
@@ -56,4 +56,11 @@ func CloseDB() bool {
 		return err == nil
 	}
 	return false
+}
+
+// ReInitDBConnection allows the DB connection to be re-initialized
+func ReInitDBConnection() {
+	CloseDB()
+	dbInitializer = sync.Once{}
+	successful = false
 }

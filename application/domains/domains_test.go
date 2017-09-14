@@ -1,4 +1,4 @@
-package application
+package domains
 
 import (
 	"database/sql"
@@ -7,33 +7,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/imyousuf/lan-messenger/application/storage"
+	"github.com/imyousuf/lan-messenger/application/conf"
+	s "github.com/imyousuf/lan-messenger/application/storage"
+	"github.com/imyousuf/lan-messenger/application/testutils"
 	"github.com/imyousuf/lan-messenger/packet"
 	"github.com/imyousuf/lan-messenger/profile"
 	"github.com/imyousuf/lan-messenger/utils"
 )
 
 const (
-	deleteUserModelsSQL          = "DELETE FROM user_models"
-	deleteSessionModelsSQL       = "DELETE FROM session_models"
+	deleteUserModelsSQL          = testutils.DeleteUserModelsSQL
+	deleteSessionModelsSQL       = testutils.DeleteSessionModelsSQL
 	countUserModelsByUsernameSQL = "SELECT count(*) FROM user_models WHERE username = ?"
 )
 
 var globalDbSetupForDomainTests = sync.Once{}
 
 func setupCleanTestTablesForDomainTests() {
-	setupCleanTestTablesWithInitializer(&globalDbSetupForDomainTests)
-}
-
-func setupCleanTestTablesWithInitializer(dbSetupInitializer *sync.Once) {
-	dbSetupInitializer.Do(func() {
-		loadConfiguration = GetTestConfiguration()
-		locationInitializer = sync.Once{}
-		dbInitializer = sync.Once{}
-		successful = false
+	globalDbSetupForDomainTests.Do(func() {
+		conf.SetupNewConfiguration(testutils.MockLoadFunc)
+		s.ReInitDBConnection()
 	})
-	GetDB().Exec(deleteUserModelsSQL)
-	GetDB().Exec(deleteSessionModelsSQL)
+	s.GetDB().Exec(deleteUserModelsSQL)
+	s.GetDB().Exec(deleteSessionModelsSQL)
 }
 
 func checkRowCount(row *sql.Row, expectedRowCount uint) bool {
@@ -54,18 +50,18 @@ func assertUserProfileData(userProfile profile.UserProfile, user *User, t *testi
 
 func TestNewUser(t *testing.T) {
 	setupCleanTestTablesForDomainTests()
-	uProfile := profile.NewUserProfile(GetUserProfile())
+	uProfile := profile.NewUserProfile(conf.GetUserProfile())
 	user := NewUser(uProfile)
-	if GetDB().NewRecord(&user.userModel) || user.userProfile == nil {
+	if s.GetDB().NewRecord(&user.userModel) || user.userProfile == nil {
 		t.Error("Could not persist new user")
 	}
 	assertUserProfileData(uProfile, user, t)
 	modelID := user.userModel.ID
-	if !checkRowCount(GetDB().Raw(countUserModelsByUsernameSQL, uProfile.GetUsername()).Row(), 1) {
+	if !checkRowCount(s.GetDB().Raw(countUserModelsByUsernameSQL, uProfile.GetUsername()).Row(), 1) {
 		t.Error("Could not match records in DB")
 	}
-	uProfile = profile.NewUserProfile(GetUserProfile())
-	if !checkRowCount(GetDB().Raw(countUserModelsByUsernameSQL, uProfile.GetUsername()).Row(), 1) {
+	uProfile = profile.NewUserProfile(conf.GetUserProfile())
+	if !checkRowCount(s.GetDB().Raw(countUserModelsByUsernameSQL, uProfile.GetUsername()).Row(), 1) {
 		t.Error("Could not match records in DB")
 	}
 	if modelID != user.userModel.ID {
@@ -75,22 +71,22 @@ func TestNewUser(t *testing.T) {
 
 func TestGetUserByUsername(t *testing.T) {
 	setupCleanTestTablesForDomainTests()
-	uProfile := profile.NewUserProfile(GetUserProfile())
+	uProfile := profile.NewUserProfile(conf.GetUserProfile())
 	user, found := GetUserByUsername(uProfile.GetUsername())
-	if found || !GetDB().NewRecord(user.userModel) {
+	if found || !s.GetDB().NewRecord(user.userModel) {
 		t.Error("Should not have found any record!")
 	}
 	NewUser(uProfile)
 	user, found = GetUserByUsername(uProfile.GetUsername())
 	assertUserProfileData(uProfile, user, t)
-	if !found || GetDB().NewRecord(user.userModel) {
+	if !found || s.GetDB().NewRecord(user.userModel) {
 		t.Error("Should have found record!")
 	}
 }
 
 func TestUser_IsPersisted(t *testing.T) {
 	setupCleanTestTablesForDomainTests()
-	uProfile := profile.NewUserProfile(GetUserProfile())
+	uProfile := profile.NewUserProfile(conf.GetUserProfile())
 	user, found := GetUserByUsername(uProfile.GetUsername())
 	if found || user.IsPersisted() {
 		t.Error("Should not have found any record!")
@@ -109,7 +105,7 @@ func TestUser_IsPersisted(t *testing.T) {
 
 func TestUser_GetUserProfile(t *testing.T) {
 	setupCleanTestTablesForDomainTests()
-	uProfile := profile.NewUserProfile(GetUserProfile())
+	uProfile := profile.NewUserProfile(conf.GetUserProfile())
 	user := NewUser(uProfile)
 	if user.GetUserProfile() == nil || uProfile != user.GetUserProfile() {
 		t.Error("Correct instace of user profile not set")
@@ -119,7 +115,7 @@ func TestUser_GetUserProfile(t *testing.T) {
 // **************** Session ****************
 
 func cloneSession(session Session) *Session {
-	session.sessionModel = &storage.SessionModel{}
+	session.sessionModel = &s.SessionModel{}
 	return &session
 }
 
@@ -132,7 +128,7 @@ func TestUser_AddSession(t *testing.T) {
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
 	secondSession := NewSession(secondSessionID, devicePrefIndex, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	// Test adding session to a user not persisted
 	t.Run("Add Session to non-persisted User", func(t *testing.T) {
@@ -215,7 +211,7 @@ func TestUser_GetActiveSessions(t *testing.T) {
 	secondSession := NewSession(secondSessionID, devicePrefIndex+1, expiryTime, replyToStr)
 	expiredSession := NewSession(expiredSessionID, devicePrefIndex+2, expiryTime.Add(-1*time.Hour),
 		replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	persistedUser.AddSession(mainSession)
 	persistedUser.AddSession(secondSession)
@@ -248,7 +244,7 @@ func TestUser_GetMainSession(t *testing.T) {
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
 	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	session, found := persistedUser.GetMainSession()
 	if found || session.IsPersisted() {
@@ -271,7 +267,7 @@ func TestGetSessionBySessionID(t *testing.T) {
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
 	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	log.Println("Created A1", persistedUser.AddSession(cloneSession(*mainSession)))
 	log.Println("Created A2", persistedUser.AddSession(cloneSession(*secondSession)))
@@ -331,7 +327,7 @@ func TestSession_GetReplyToConnectionString(t *testing.T) {
 	devicePrefIndex := uint8(1)
 	replyToStr := "127.0.0.1:4000"
 	mainSession := NewSession(sessionID, devicePrefIndex, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	log.Println("Created A1", persistedUser.AddSession(cloneSession(*mainSession)))
 	if session, found := GetSessionBySessionID(sessionID); found && session.GetReplyToConnectionString() != replyToStr {
@@ -368,7 +364,7 @@ func TestSession_Renew(t *testing.T) {
 	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
 	thirdSessionID := "A3"
 	thirdSession := NewSession(thirdSessionID, devicePrefIndex-2, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	persistedUser.AddSession(thirdSession)
 	t.Run("Test Invalid renewal time", func(t *testing.T) {
@@ -415,7 +411,7 @@ func TestSession_SignOff(t *testing.T) {
 	secondSession := NewSession(secondSessionID, devicePrefIndex-1, expiryTime, replyToStr)
 	thirdSessionID := "A3"
 	thirdSession := NewSession(thirdSessionID, devicePrefIndex-2, expiryTime, replyToStr)
-	defaultProfile := profile.NewUserProfile(GetUserProfile())
+	defaultProfile := profile.NewUserProfile(conf.GetUserProfile())
 	persistedUser := NewUser(defaultProfile)
 	persistedUser.AddSession(thirdSession)
 	t.Run("sign off persisted session", func(t *testing.T) {

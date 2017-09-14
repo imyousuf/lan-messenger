@@ -1,45 +1,27 @@
-package application
+package conf
 
 import (
-	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/go-ini/ini"
+	"github.com/imyousuf/lan-messenger/application/testutils"
 	"github.com/imyousuf/lan-messenger/utils"
 )
 
 const (
-	port            = 34534
-	iface           = "eth0"
-	username        = "nicename"
-	displayName     = "What to Show"
-	email           = "user@email.co"
-	deviceIndex     = 100
-	storageLocation = "/tmp/test-lamess/"
-	iniConfigFmt    = `[network]
-	port=%d
-	interface=%s
-	
-	[profile]
-	username=%s
-	displayname=%s
-	email=%s
-	
-	[device]
-	deviceindex=%d
-
-	[storage]
-	location=%s
-	`
+	port            = testutils.Port
+	iface           = testutils.Iface
+	username        = testutils.Username
+	displayName     = testutils.DisplayName
+	email           = testutils.Email
+	deviceIndex     = testutils.DeviceIndex
+	storageLocation = testutils.StorageLocation
+	iniConfigFmt    = testutils.IniConfigFmt
 )
 
-var mockLoadFunc = func() (*ini.File, error) {
-	return ini.InsensitiveLoad([]byte(fmt.Sprintf(iniConfigFmt, port, iface, username, displayName,
-		email, deviceIndex, storageLocation)))
-}
+var mockLoadFunc = testutils.MockLoadFunc
 
 func TestMissingMandatoryConfigs(t *testing.T) {
 	loadConfiguration = func() (*ini.File, error) {
@@ -86,8 +68,7 @@ func TestGetNetworkConfig(t *testing.T) {
 }
 
 func TestGetUserProfile(t *testing.T) {
-	loadConfiguration = mockLoadFunc
-	locationInitializer = sync.Once{}
+	SetupNewConfiguration(GetTestConfiguration())
 	if cUsername, cDisplayName, cEmail := GetUserProfile(); cUsername != username ||
 		cDisplayName != displayName || cEmail != email {
 		t.Error("User profile config not returned correctly!", cUsername, cDisplayName, cEmail,
@@ -96,8 +77,7 @@ func TestGetUserProfile(t *testing.T) {
 }
 
 func TestGetStorageLocation(t *testing.T) {
-	loadConfiguration = mockLoadFunc
-	locationInitializer = sync.Once{}
+	SetupNewConfiguration(GetTestConfiguration())
 	if storageLocation != GetStorageLocation() {
 		t.Error("Expected storage location not returned")
 	}
@@ -127,12 +107,11 @@ func TestDefaultGetDeviceConfig(t *testing.T) {
 }
 
 func TestDefaultStorageLocation(t *testing.T) {
-	loadConfiguration = func() (*ini.File, error) {
+	SetupNewConfiguration(func() (*ini.File, error) {
 		return ini.InsensitiveLoad([]byte(`
 		[device]
 		deviceindex1=0`))
-	}
-	locationInitializer = sync.Once{}
+	})
 	defaultLocation := GetStorageLocation()
 	if _, err := os.Stat(defaultLocation); os.IsNotExist(err) {
 		t.Error("Default location does not exist")
@@ -184,12 +163,11 @@ func TestMissingUserProfileConfig(t *testing.T) {
 }
 
 func TestPanicableGetStorageLocation(t *testing.T) {
-	loadConfiguration = func() (*ini.File, error) {
+	SetupNewConfiguration(func() (*ini.File, error) {
 		return ini.InsensitiveLoad([]byte(`
 		[storage]
 		location=/asd/0`))
-	}
-	locationInitializer = sync.Once{}
+	})
 	utils.PanicableInvocation(func() {
 		GetStorageLocation()
 		t.Error("Should have panicked when creating storage location")

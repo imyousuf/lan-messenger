@@ -1,4 +1,4 @@
-package application
+package conf
 
 import (
 	"log"
@@ -127,4 +127,10 @@ func GetStorageLocation() string {
 		panic(err)
 	}
 	return storageLocation
+}
+
+// SetupNewConfiguration allows the application to load configuration in an alternate way
+func SetupNewConfiguration(newLoadFunc func() (*ini.File, error)) {
+	loadConfiguration = newLoadFunc
+	locationInitializer = sync.Once{}
 }
